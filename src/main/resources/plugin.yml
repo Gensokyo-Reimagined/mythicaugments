@@ -1,0 +1,10 @@
+name: mythicaugments
+version: '1.0-SNAPSHOT'
+main: net.taiyou.mythicaugments.MythicAugments
+api-version: 1.21
+depend: [MythicMobs]
+commands:
+  mythicaugments:
+    description: Admin commands for MythicAugments
+    permission: mythicaugments.admin
+    aliases: [ma]

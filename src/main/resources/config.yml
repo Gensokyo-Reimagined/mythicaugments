@@ -1,0 +1,46 @@
+# MythicAugments Configuration
+
+persistent-item:
+  enabled: true
+  material: ENDER_CHEST
+  slot: 8
+  name: "&d&lAugment Menu &7(Right Click)"
+  lore:
+    - "&7Click to manage your"
+    - "&7active augments."
+  give-on-join: true
+  locked: true
+
+menu:
+  title: "&8Augment Configuration"
+  rows: 3
+  filler:
+    material: GRAY_STAINED_GLASS_PANE
+    name: " "
+
+sockets:
+  11:
+    type: "offensive"
+    placeholder:
+      material: RED_STAINED_GLASS_PANE
+      name: "&c&lOffensive Slot"
+      lore:
+        - "&7Place an &cOffensive &7augment here."
+
+  15:
+    type: "defensive"
+    placeholder:
+      material: BLUE_STAINED_GLASS_PANE
+      name: "&9&lDefensive Slot"
+      lore:
+        - "&7Place a &9Defensive &7augment here."
+
+mythic-items:
+  snake_hairpiece:
+    type: "offensive"
+    tag: "augment.speed"
+    passive-skill: "SnakeSpeedPassive"
+
+messages:
+  invalid-item: "&cThis item cannot be placed in this slot!"
+  saved: "&aAugments updated."

@@ -13,32 +13,73 @@ persistent-item:
 
 menu:
   title: "&8Augment Configuration"
-  rows: 3
+  rows: 4
   filler:
     material: GRAY_STAINED_GLASS_PANE
     name: " "
 
 sockets:
   11:
-    type: "offensive"
+    type: "amulets"
     placeholder:
       material: RED_STAINED_GLASS_PANE
-      name: "&c&lOffensive Slot"
+      name: "&cAmulet Slot"
       lore:
-        - "&7Place an &cOffensive &7augment here."
-
+        - "&7Place an &cAmulet &7here."
+  12:
+    type: "amulets"
+    placeholder:
+      material: RED_STAINED_GLASS_PANE
+      name: "&cAmulet Slot"
+      lore:
+        - "&7Place an &cAmulet &7here."
+  13:
+    type: "amulets"
+    placeholder:
+      material: RED_STAINED_GLASS_PANE
+      name: "&cAmulet Slot"
+      lore:
+        - "&7Place an &cAmulet &7here."
   15:
-    type: "defensive"
+    type: "lens"
     placeholder:
       material: BLUE_STAINED_GLASS_PANE
-      name: "&9&lDefensive Slot"
+      name: "&9Lens Slot"
       lore:
-        - "&7Place a &9Defensive &7augment here."
+        - "&7Place an &9Lens &7here."
+  20:
+    type: "charm"
+    placeholder:
+      material: PINK_STAINED_GLASS_PANE
+      name: "&5Charm Slot"
+      lore:
+        - "&7Place an &5Lens &7here."
+  21:
+    type: "charm"
+    placeholder:
+      material: PINK_STAINED_GLASS_PANE
+      name: "&5Charm Slot"
+      lore:
+        - "&7Place an &5Lens &7here."
+  23:
+    type: "jewelry"
+    placeholder:
+      material: WHITE_STAINED_GLASS_PANE
+      name: "&fJewelry Slot"
+      lore:
+        - "&7Place an &fJewelry &7here."
+  24:
+    type: "jewelry"
+    placeholder:
+      material: WHITE_STAINED_GLASS_PANE
+      name: "&fJewelry Slot"
+      lore:
+        - "&7Place an &fJewelry &7here."
 
 mythic-items:
   snake_hairpiece:
-    type: "offensive"
-    tag: "augment.speed"
+    type: "amulet"
+    tag: "amulet"
     passive-skill: "SnakeSpeedPassive"
 
 messages:

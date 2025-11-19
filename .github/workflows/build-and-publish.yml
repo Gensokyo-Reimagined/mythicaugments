@@ -1,0 +1,43 @@
+name: Build plugin and blow up
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: JDK 21 setup
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          server-id: github
+          settings-path: ${{ github.workspace }}
+
+      - name: Gradle plz build
+        uses: gradle/actions/setup-gradle@v3
+        env:
+          GENSOKYOUSER: ${{ secrets.ORG_GRADLE_PROJECT_GENSOREPOUSERNAME }}
+          GENSOKYOTOKEN: ${{ secrets.ORG_GRADLE_PROJECT_GENSOREPOPASSWORD }}
+        with:
+          arguments: build
+
+      - name: GitHub save this jar for me kthx
+        uses: actions/upload-artifact@v4
+        with:
+          name: afdianintegration-plugin
+          path: build/libs/*.jar
+
+      - name: Reposilite hates my posterior
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          arguments: publish
+        env:
+          GENSOKYOUSER: ${{ secrets.ORG_GRADLE_PROJECT_GENSOREPOUSERNAME }}
+          GENSOKYOTOKEN: ${{ secrets.ORG_GRADLE_PROJECT_GENSOREPOPASSWORD }}

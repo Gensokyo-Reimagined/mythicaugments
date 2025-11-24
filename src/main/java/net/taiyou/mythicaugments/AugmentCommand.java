@@ -20,7 +20,8 @@ public class AugmentCommand implements CommandExecutor {
     }
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label,
+            @NotNull String[] args) {
         if (!sender.hasPermission("mythicaugments.admin")) {
             sender.sendMessage("§cNo permission.");
             return true;
@@ -41,14 +42,24 @@ public class AugmentCommand implements CommandExecutor {
                 plugin.getAugmentManager().debugMode = !plugin.getAugmentManager().debugMode;
                 sender.sendMessage("§eDebug mode: " + plugin.getAugmentManager().debugMode);
                 if (sender instanceof Player) {
-                    List<String> skills = plugin.getAugmentManager().getCache().get(((Player) sender).getUniqueId());
-                    sender.sendMessage("§7Your active skills: " + (skills != null ? skills.toString() : "None"));
+                    List<AugmentSkill> skills = plugin.getAugmentManager().getCache()
+                            .get(((Player) sender).getUniqueId());
+                    if (skills != null && !skills.isEmpty()) {
+                        sender.sendMessage("§7Your active skills:");
+                        for (AugmentSkill skill : skills) {
+                            sender.sendMessage(
+                                    "§7- " + skill.getSkillLine() + " (Interval: " + skill.getInterval() + ")");
+                        }
+                    } else {
+                        sender.sendMessage("§7Your active skills: None");
+                    }
                 }
                 return true;
             }
 
             if (args[0].equalsIgnoreCase("info")) {
-                if (!(sender instanceof Player)) return true;
+                if (!(sender instanceof Player))
+                    return true;
                 Player p = (Player) sender;
                 ItemStack item = p.getInventory().getItemInMainHand();
                 if (item == null || item.getType().isAir()) {
@@ -60,15 +71,19 @@ public class AugmentCommand implements CommandExecutor {
                 p.sendMessage("§e--- Item Info ---");
                 p.sendMessage("§7Mythic ID: §f" + (mythicId == null ? "None" : mythicId));
 
-                String skill = plugin.getAugmentManager().getSkillFromItem(item);
-                p.sendMessage("§7Mapped Skill: §f" + (skill == null ? "None" : skill));
-
-                String tag = plugin.getAugmentManager().getAugmentTag(item);
-                p.sendMessage("§7Tag: §f" + tag);
+                List<AugmentSkill> skills = plugin.getAugmentManager().getSkillsFromItem(item);
+                if (skills != null && !skills.isEmpty()) {
+                    p.sendMessage("§7Mapped Skills:");
+                    for (AugmentSkill s : skills) {
+                        p.sendMessage("§7- " + s.getSkillLine() + " (" + s.getInterval() + "t)");
+                    }
+                } else {
+                    p.sendMessage("§7Mapped Skills: §fNone");
+                }
                 return true;
             }
 
-            if (args[0].equalsIgnoreCase("apply") && args.length >= 3) {
+            if (args[0].equalsIgnoreCase("apply") && args.length >= 2) {
                 if (!(sender instanceof Player)) {
                     sender.sendMessage("Players only.");
                     return true;
@@ -82,14 +97,13 @@ public class AugmentCommand implements CommandExecutor {
                 }
 
                 String type = args[1];
-                String tag = args[2];
 
                 ItemMeta meta = item.getItemMeta();
-                meta.getPersistentDataContainer().set(plugin.getAugmentManager().KEY_AUGMENT_TYPE, PersistentDataType.STRING, type);
-                meta.getPersistentDataContainer().set(plugin.getAugmentManager().KEY_AUGMENT_TAG, PersistentDataType.STRING, tag);
+                meta.getPersistentDataContainer().set(plugin.getAugmentManager().KEY_AUGMENT_TYPE,
+                        PersistentDataType.STRING, type);
 
                 item.setItemMeta(meta);
-                player.sendMessage("§aApplied augment data: Type=" + type + ", Tag=" + tag);
+                player.sendMessage("§aApplied augment data: Type=" + type);
                 return true;
             }
         }
@@ -98,7 +112,7 @@ public class AugmentCommand implements CommandExecutor {
         sender.sendMessage("§e/ma reload");
         sender.sendMessage("§e/ma debug - Toggle console debug logs");
         sender.sendMessage("§e/ma info - Info about item in hand");
-        sender.sendMessage("§e/ma apply <type> <tag> - Apply augment data to held item");
+        sender.sendMessage("§e/ma apply <type> - Apply augment data to held item");
         return true;
     }
 }

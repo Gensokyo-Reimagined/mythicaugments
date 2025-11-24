@@ -6,9 +6,14 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -21,21 +26,31 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import io.lumine.mythic.core.items.MythicItem;
 
 public class AugmentManager {
 
     private final MythicAugments plugin;
+    private final DynamicSkillManager dynamicSkillManager;
     private final Map<Integer, Socket> sockets = new HashMap<>();
     private final Map<String, RegisteredAugment> mythicAugmentMap = new HashMap<>();
 
     // Concurrent map to prevent modification errors during tick
-    private final Map<UUID, List<String>> activeSkillCache = new ConcurrentHashMap<>();
+    private final Map<UUID, List<AugmentSkill>> activeSkillCache = new ConcurrentHashMap<>();
+    // Cache for active stats to help with debugging or display, though modifiers
+    // are stored on the player
+    private final Map<UUID, List<AugmentStat>> activeStatCache = new ConcurrentHashMap<>();
+
+    // Optimization Caches
+    private final Map<String, io.lumine.mythic.core.skills.stats.StatType> statTypeCache = new ConcurrentHashMap<>();
+    private final Map<String, Attribute> attributeCache = new ConcurrentHashMap<>();
 
     public boolean debugMode = false; // Toggle with /ma debug
 
     public final NamespacedKey KEY_MENU_ITEM;
     public final NamespacedKey KEY_AUGMENT_TYPE;
-    public final NamespacedKey KEY_AUGMENT_TAG;
     public final NamespacedKey KEY_SAVED_INVENTORY;
 
     // Caches
@@ -45,9 +60,9 @@ public class AugmentManager {
 
     public AugmentManager(MythicAugments plugin) {
         this.plugin = plugin;
+        this.dynamicSkillManager = new DynamicSkillManager(plugin);
         this.KEY_MENU_ITEM = new NamespacedKey(plugin, "menu_item");
         this.KEY_AUGMENT_TYPE = new NamespacedKey(plugin, "augment_type");
-        this.KEY_AUGMENT_TAG = new NamespacedKey(plugin, "augment_tag");
         this.KEY_SAVED_INVENTORY = new NamespacedKey(plugin, "saved_inv");
         loadSockets();
     }
@@ -98,10 +113,8 @@ public class AugmentManager {
         if (mythicSection != null) {
             for (String key : mythicSection.getKeys(false)) {
                 String type = mythicSection.getString(key + ".type");
-                String tag = mythicSection.getString(key + ".tag");
-                String passiveSkill = mythicSection.getString(key + ".passive-skill");
                 // Store keys as lower case for case-insensitive lookup
-                mythicAugmentMap.put(key.toLowerCase(), new RegisteredAugment(type, tag, passiveSkill));
+                mythicAugmentMap.put(key.toLowerCase(), new RegisteredAugment(type));
             }
         }
     }
@@ -113,7 +126,9 @@ public class AugmentManager {
             if (activeSkillCache.isEmpty())
                 return;
 
-            for (Map.Entry<UUID, List<String>> entry : activeSkillCache.entrySet()) {
+            long currentTime = System.currentTimeMillis();
+
+            for (Map.Entry<UUID, List<AugmentSkill>> entry : activeSkillCache.entrySet()) {
                 Player player = Bukkit.getPlayer(entry.getKey());
 
                 // Cleanup offline players
@@ -122,12 +137,15 @@ public class AugmentManager {
                     continue;
                 }
 
-                List<String> skills = entry.getValue();
+                List<AugmentSkill> skills = entry.getValue();
                 if (skills == null || skills.isEmpty())
                     continue;
 
-                for (String skillName : skills) {
-                    executeSkill(player, skillName);
+                for (AugmentSkill skill : skills) {
+                    if (currentTime - skill.getLastExecuted() >= skill.getInterval() * 50L) {
+                        executeSkill(player, skill.getSkillLine());
+                        skill.setLastExecuted(currentTime);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -144,17 +162,20 @@ public class AugmentManager {
             if (success) {
                 if (debugMode) {
                     // Only log occasionally to avoid spam, or use a cooldown
-                    // plugin.getLogger().info("DEBUG: Ticked " + skillName + " for " +
-                    // player.getName());
                 }
             } else {
                 if (debugMode) {
-                    plugin.getLogger().warning("DEBUG: Failed to cast skill: " + skillName);
-                    plugin.getLogger()
-                            .warning("-> Ensure you have created a file in 'plugins/MythicMobs/Skills/' with:");
-                    plugin.getLogger().warning("-> " + skillName + ":");
-                    plugin.getLogger().warning("->   Skills:");
-                    plugin.getLogger().warning("->   - ... your mechanics here ...");
+                    plugin.getLogger().warning("DEBUG: Failed to cast skill: '" + skillName + "'");
+                    if (skillName.contains("{") || skillName.contains(" ") || skillName.contains("@")) {
+                        plugin.getLogger().warning("-> It looks like you are using an inline mechanic.");
+                        plugin.getLogger()
+                                .warning("-> The Augment system requires NAMED skills (e.g., 'SnakeSpeedPassive').");
+                        plugin.getLogger().warning(
+                                "-> Please create a skill file in MythicMobs/Skills/ and reference it in your item.");
+                    } else {
+                        plugin.getLogger().warning(
+                                "-> Ensure the skill '" + skillName + "' exists in your MythicMobs/Skills/ folder.");
+                    }
                 }
             }
         } catch (Exception e) {
@@ -169,51 +190,389 @@ public class AugmentManager {
 
     public void removeCache(Player player) {
         activeSkillCache.remove(player.getUniqueId());
+        removeStats(player);
     }
 
     private void recalculatePlayerSkills(Player player, ItemStack[] items) {
-        List<String> skillsToRun = new ArrayList<>();
+        List<AugmentSkill> skillsToRun = new ArrayList<>();
+        List<AugmentStat> statsToApply = new ArrayList<>();
 
         if (items != null) {
             for (ItemStack item : items) {
                 if (item == null || item.getType() == Material.AIR)
                     continue;
 
-                String skill = getSkillFromItem(item);
-                if (skill != null) {
-                    skillsToRun.add(skill);
-                } else {
-                    if (debugMode) {
-                        String mythicId = getMythicID(item);
-                        if (mythicId != null) {
-                            plugin.getLogger().info("DEBUG: Item " + mythicId + " has no mapped skill.");
-                        }
-                    }
+                List<AugmentSkill> itemSkills = getSkillsFromItem(item);
+                if (itemSkills != null && !itemSkills.isEmpty()) {
+                    skillsToRun.addAll(itemSkills);
+                }
+
+                List<AugmentStat> itemStats = getStatsFromItem(item);
+                if (itemStats != null && !itemStats.isEmpty()) {
+                    statsToApply.addAll(itemStats);
                 }
             }
         }
 
+        // Update Skills
         if (!skillsToRun.isEmpty()) {
             activeSkillCache.put(player.getUniqueId(), skillsToRun);
             if (debugMode)
-                plugin.getLogger().info("Loaded skills for " + player.getName() + ": " + skillsToRun);
+                plugin.getLogger().info("Loaded skills for " + player.getName() + ": " + skillsToRun.size());
         } else {
             activeSkillCache.remove(player.getUniqueId());
             if (debugMode)
                 plugin.getLogger().info("No skills loaded for " + player.getName());
         }
+
+        // Update Stats
+        removeStats(player); // Remove old stats first
+        if (!statsToApply.isEmpty()) {
+            applyStats(player, statsToApply);
+            activeStatCache.put(player.getUniqueId(), statsToApply);
+            if (debugMode)
+                plugin.getLogger().info("Loaded stats for " + player.getName() + ": " + statsToApply.size());
+        } else {
+            activeStatCache.remove(player.getUniqueId());
+        }
     }
 
-    // Helper to get skill from ANY item (Mythic or Vanilla with Tags)
-    public String getSkillFromItem(ItemStack item) {
-        // 1. Check Mythic ID
-        String mythicId = getMythicID(item);
-        if (mythicId != null && mythicAugmentMap.containsKey(mythicId.toLowerCase())) {
-            return mythicAugmentMap.get(mythicId.toLowerCase()).passiveSkill;
+    // --- StatSource Implementation ---
+
+    private final AugmentStatSource statSource = new AugmentStatSource();
+
+    public class AugmentStatSource implements io.lumine.mythic.core.skills.stats.StatSource {
+        @Override
+        public boolean removeOnReload() {
+            return true;
         }
-        // 2. Check if it has a manual tag that maps to something (Not implemented in
-        // config yet, but good for future)
-        return null;
+    }
+
+    private void applyStats(Player player, List<AugmentStat> stats) {
+        if (debugMode)
+            plugin.getLogger().info("Applying stats to " + player.getName() + ": " + stats.size());
+        // 1. Aggregate stats to avoid multiple modifiers for the same stat
+        Map<String, Double> additiveMap = new HashMap<>();
+        Map<String, Double> multiplyMap = new HashMap<>();
+
+        for (AugmentStat stat : stats) {
+            String key = stat.getStat().toUpperCase();
+            double value = stat.getValue();
+            if (stat.getType().equalsIgnoreCase("MULTIPLY")) {
+                multiplyMap.put(key, multiplyMap.getOrDefault(key, 0.0) + value);
+            } else {
+                additiveMap.put(key, additiveMap.getOrDefault(key, 0.0) + value);
+            }
+        }
+
+        // 2. Apply Bukkit Attributes
+        applyBukkitStats(player, additiveMap, multiplyMap);
+
+        // 3. Apply Mythic Stats
+        applyMythicStats(player, additiveMap, multiplyMap);
+    }
+
+    private void applyBukkitStats(Player player, Map<String, Double> additive, Map<String, Double> multiply) {
+        Set<String> processed = new HashSet<>();
+
+        // Helper to process both maps
+        processBukkitStatMap(player, additive, AttributeModifier.Operation.ADD_NUMBER, processed);
+        processBukkitStatMap(player, multiply, AttributeModifier.Operation.ADD_SCALAR, processed);
+    }
+
+    private void processBukkitStatMap(Player player, Map<String, Double> map, AttributeModifier.Operation op,
+            Set<String> processed) {
+        for (Map.Entry<String, Double> entry : map.entrySet()) {
+            String statName = entry.getKey();
+            Attribute attribute = mapStatToAttribute(statName);
+
+            if (attribute != null) {
+                AttributeInstance instance = player.getAttribute(attribute);
+                if (instance != null) {
+                    NamespacedKey key = new NamespacedKey(plugin,
+                            "augment_" + statName.toLowerCase() + "_" + UUID.randomUUID().toString().substring(0, 8));
+                    AttributeModifier modifier = new AttributeModifier(key, entry.getValue(), op,
+                            EquipmentSlotGroup.ANY);
+                    instance.addModifier(modifier);
+                    if (debugMode)
+                        plugin.getLogger().info("Applied Bukkit stat: " + statName + " = " + entry.getValue());
+                } else {
+                    if (debugMode)
+                        plugin.getLogger().warning("AttributeInstance null for: " + statName);
+                }
+            }
+        }
+    }
+
+    private void applyMythicStats(Player player, Map<String, Double> additive, Map<String, Double> multiply) {
+        try {
+            io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
+                    .getPlayerManager().getProfile(player).getStatRegistry();
+
+            // Apply Additive
+            for (Map.Entry<String, Double> entry : additive.entrySet()) {
+                if (mapStatToAttribute(entry.getKey()) != null)
+                    continue; // Skip if handled by Bukkit
+
+                io.lumine.mythic.core.skills.stats.StatType type = getStatType(entry.getKey());
+                if (type != null) {
+                    registry.putValue(type, statSource, io.lumine.mythic.core.skills.stats.StatModifierType.ADDITIVE,
+                            entry.getValue());
+                    if (debugMode)
+                        plugin.getLogger().info("Applied Mythic stat: " + entry.getKey() + " = " + entry.getValue());
+                }
+            }
+
+            // Apply Multiply
+            for (Map.Entry<String, Double> entry : multiply.entrySet()) {
+                if (mapStatToAttribute(entry.getKey()) != null)
+                    continue; // Skip if handled by Bukkit
+
+                io.lumine.mythic.core.skills.stats.StatType type = getStatType(entry.getKey());
+                if (type != null) {
+                    registry.putValue(type, statSource,
+                            io.lumine.mythic.core.skills.stats.StatModifierType.ADDITIVE_MULTIPLIER, entry.getValue());
+                    if (debugMode)
+                        plugin.getLogger()
+                                .info("Applied Mythic stat (Mult): " + entry.getKey() + " = " + entry.getValue());
+                }
+            }
+        } catch (Exception e) {
+            if (debugMode) {
+                plugin.getLogger().warning("Failed to apply Mythic stats: " + e.getMessage());
+            }
+        }
+    }
+
+    private io.lumine.mythic.core.skills.stats.StatType getStatType(String name) {
+        String key = name.toUpperCase();
+        if (statTypeCache.containsKey(key)) {
+            return statTypeCache.get(key);
+        }
+        try {
+            java.lang.reflect.Field field = io.lumine.mythic.core.skills.stats.Stats.class.getField(key);
+            io.lumine.mythic.core.skills.stats.StatType type = (io.lumine.mythic.core.skills.stats.StatType) field
+                    .get(null);
+            statTypeCache.put(key, type);
+            return type;
+        } catch (Exception e) {
+            if (debugMode)
+                plugin.getLogger().warning("Unknown Mythic stat: " + name);
+            // Cache nulls to avoid repeated reflection lookups for invalid stats
+            statTypeCache.put(key, null);
+            return null;
+        }
+    }
+
+    private void removeStats(Player player) {
+        try {
+            // 1. Remove Bukkit Modifiers
+            List<Attribute> attributes = new ArrayList<>();
+            attributes.add(Attribute.MAX_HEALTH);
+            attributes.add(Attribute.ATTACK_DAMAGE);
+            attributes.add(Attribute.MOVEMENT_SPEED);
+            attributes.add(Attribute.ARMOR);
+            attributes.add(Attribute.ARMOR_TOUGHNESS);
+            attributes.add(Attribute.LUCK);
+            attributes.add(Attribute.KNOCKBACK_RESISTANCE);
+            try {
+                attributes.add(Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_speed")));
+            } catch (Exception e) {
+                if (debugMode)
+                    plugin.getLogger().warning("Could not find generic.attack_speed attribute.");
+            }
+
+            for (Attribute attr : attributes) {
+                if (attr == null)
+                    continue;
+                AttributeInstance instance = player.getAttribute(attr);
+                if (instance != null) {
+                    List<AttributeModifier> toRemove = new ArrayList<>();
+                    for (AttributeModifier modifier : instance.getModifiers()) {
+                        if (modifier.getKey().getNamespace().equals(plugin.getName().toLowerCase())) {
+                            toRemove.add(modifier);
+                        }
+                    }
+                    for (AttributeModifier modifier : toRemove) {
+                        instance.removeModifier(modifier);
+                    }
+                }
+            }
+
+            // 2. Remove Mythic Stats
+            io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
+                    .getPlayerManager().getProfile(player).getStatRegistry();
+
+            // Optimization: Use cache if available to only remove what we added
+            List<AugmentStat> cachedStats = activeStatCache.get(player.getUniqueId());
+            if (cachedStats != null && !cachedStats.isEmpty()) {
+                Set<String> processedStats = new HashSet<>();
+                for (AugmentStat stat : cachedStats) {
+                    String statName = stat.getStat().toUpperCase();
+                    if (processedStats.contains(statName))
+                        continue;
+
+                    // Skip if it's a Bukkit attribute (handled above)
+                    if (mapStatToAttribute(statName) != null)
+                        continue;
+
+                    io.lumine.mythic.core.skills.stats.StatType type = getStatType(statName);
+                    if (type != null) {
+                        registry.removeValue(type, statSource);
+                    }
+                    processedStats.add(statName);
+                }
+            } else {
+                // Fallback: Scan all stats (slow, but necessary if cache is missing)
+                if (debugMode)
+                    plugin.getLogger()
+                            .info("Cache miss during removal for " + player.getName() + ", performing full scan.");
+                for (java.lang.reflect.Field field : io.lumine.mythic.core.skills.stats.Stats.class.getFields()) {
+                    if (field.getType().equals(io.lumine.mythic.core.skills.stats.StatType.class)) {
+                        io.lumine.mythic.core.skills.stats.StatType type = (io.lumine.mythic.core.skills.stats.StatType) field
+                                .get(null);
+                        registry.removeValue(type, statSource);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            if (debugMode)
+                plugin.getLogger().warning("Error removing stats: " + e.getMessage());
+        }
+    }
+
+    private Attribute mapStatToAttribute(String stat) {
+        String key = stat.toUpperCase();
+        if (attributeCache.containsKey(key)) {
+            return attributeCache.get(key);
+        }
+
+        Attribute attr = null;
+        switch (key) {
+            case "HEALTH":
+                attr = Attribute.MAX_HEALTH;
+                break;
+            case "DAMAGE":
+                attr = Attribute.ATTACK_DAMAGE;
+                break;
+            case "SPEED":
+                attr = Attribute.MOVEMENT_SPEED;
+                break;
+            case "ARMOR":
+            case "DEFENSE":
+                attr = Attribute.ARMOR;
+                break;
+            case "TOUGHNESS":
+                attr = Attribute.ARMOR_TOUGHNESS;
+                break;
+            case "LUCK":
+                attr = Attribute.LUCK;
+                break;
+            case "KNOCKBACK_RESISTANCE":
+                attr = Attribute.KNOCKBACK_RESISTANCE;
+                break;
+            case "ATTACK_SPEED":
+                try {
+                    attr = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_speed"));
+                } catch (Exception e) {
+                    attr = null;
+                }
+                break;
+            default:
+                attr = null;
+                break;
+        }
+
+        // Cache the result (even if null, to avoid re-switch)
+        attributeCache.put(key, attr);
+        return attr;
+    }
+
+    // Helper to get skill from Mythic Item
+    public List<AugmentSkill> getSkillsFromItem(ItemStack item) {
+        String mythicId = getMythicID(item);
+        if (mythicId == null)
+            return null;
+
+        Optional<MythicItem> mythicItemOpt = MythicBukkit.inst().getItemManager().getItem(mythicId);
+        if (!mythicItemOpt.isPresent())
+            return null;
+
+        MythicItem mythicItem = mythicItemOpt.get();
+        List<String> skills = mythicItem.getConfig().getStringList("Skills");
+        if (skills == null || skills.isEmpty())
+            return null;
+
+        List<AugmentSkill> augmentSkills = new ArrayList<>();
+        Pattern timerPattern = Pattern.compile("~onTimer:(\\d+)");
+
+        for (String skillLine : skills) {
+            Matcher matcher = timerPattern.matcher(skillLine);
+            if (matcher.find()) {
+                try {
+                    int interval = Integer.parseInt(matcher.group(1));
+                    String cleanSkill = skillLine.replaceAll("~onTimer:\\d+", "").trim();
+
+                    // Check for inline mechanics
+                    if (cleanSkill.contains("{") || cleanSkill.contains(" ") || cleanSkill.contains("@")) {
+                        // Register dynamic skill
+                        String registeredName = dynamicSkillManager.registerSkill(cleanSkill);
+                        augmentSkills.add(new AugmentSkill(registeredName, interval));
+                    } else {
+                        augmentSkills.add(new AugmentSkill(cleanSkill, interval));
+                    }
+                } catch (NumberFormatException e) {
+                    // Ignore
+                }
+            }
+        }
+        return augmentSkills;
+    }
+
+    public List<AugmentStat> getStatsFromItem(ItemStack item) {
+        String mythicId = getMythicID(item);
+        if (mythicId == null)
+            return null;
+
+        Optional<MythicItem> mythicItemOpt = MythicBukkit.inst().getItemManager().getItem(mythicId);
+        if (!mythicItemOpt.isPresent())
+            return null;
+
+        MythicItem mythicItem = mythicItemOpt.get();
+        List<String> stats = mythicItem.getConfig().getStringList("Stats");
+        if (stats == null || stats.isEmpty())
+            return null;
+
+        List<AugmentStat> augmentStats = new ArrayList<>();
+        for (String statLine : stats) {
+            // Format: STAT VALUE [TYPE]
+            // Example: HEALTH 20to30 ADDITIVE
+            String[] parts = statLine.split("\\s+");
+            if (parts.length >= 2) {
+                String stat = parts[0];
+                String valueStr = parts[1];
+                String type = (parts.length > 2) ? parts[2] : "ADDITIVE";
+
+                double value = 0;
+                if (valueStr.contains("to")) {
+                    String[] range = valueStr.split("to");
+                    try {
+                        double min = Double.parseDouble(range[0]);
+                        double max = Double.parseDouble(range[1]);
+                        value = (min + max) / 2.0; // Average for now
+                    } catch (Exception e) {
+                    }
+                } else {
+                    try {
+                        value = Double.parseDouble(valueStr);
+                    } catch (Exception e) {
+                    }
+                }
+
+                augmentStats.add(new AugmentStat(stat, value, type));
+            }
+        }
+        return augmentStats;
     }
 
     // --- Menus ---
@@ -248,7 +607,6 @@ public class AugmentManager {
 
     public void saveAugmentMenu(Player player, Inventory inv) {
         Map<Integer, ItemStack> itemsToSave = new HashMap<>();
-        Set<String> activeTags = new HashSet<>();
         ItemStack[] allItems = new ItemStack[54]; // Max size
 
         for (Map.Entry<Integer, Socket> entry : sockets.entrySet()) {
@@ -259,27 +617,11 @@ public class AugmentManager {
             if (isValidAugment(item, socket.requiredType)) {
                 itemsToSave.put(slot, item);
                 allItems[slot] = item;
-
-                String tag = getAugmentTag(item);
-                if (tag != null)
-                    activeTags.add(tag);
             }
         }
 
         savePlayerInventory(player, itemsToSave);
-        updatePlayerTags(player, activeTags);
         recalculatePlayerSkills(player, allItems);
-    }
-
-    private void updatePlayerTags(Player player, Set<String> newTags) {
-        Set<String> tagsToRemove = new HashSet<>();
-        for (String t : player.getScoreboardTags()) {
-            if (t.startsWith("augment.")) {
-                tagsToRemove.add(t);
-            }
-        }
-        tagsToRemove.forEach(player::removeScoreboardTag);
-        newTags.forEach(player::addScoreboardTag);
     }
 
     public boolean isValidAugment(ItemStack item, String requiredType) {
@@ -308,18 +650,6 @@ public class AugmentManager {
     }
 
     public String getAugmentTag(ItemStack item) {
-        if (item == null || !item.hasItemMeta())
-            return null;
-
-        String pdcTag = item.getItemMeta().getPersistentDataContainer().get(KEY_AUGMENT_TAG, PersistentDataType.STRING);
-        if (pdcTag != null)
-            return pdcTag;
-
-        String mythicId = getMythicID(item);
-        if (mythicId != null && mythicAugmentMap.containsKey(mythicId.toLowerCase())) {
-            return mythicAugmentMap.get(mythicId.toLowerCase()).tag;
-        }
-
         return null;
     }
 
@@ -333,7 +663,7 @@ public class AugmentManager {
         return sockets.get(slot);
     }
 
-    public Map<UUID, List<String>> getCache() {
+    public Map<UUID, List<AugmentSkill>> getCache() {
         return activeSkillCache;
     }
 
@@ -463,13 +793,9 @@ public class AugmentManager {
 
     public static class RegisteredAugment {
         String type;
-        String tag;
-        String passiveSkill;
 
-        public RegisteredAugment(String type, String tag, String passiveSkill) {
+        public RegisteredAugment(String type) {
             this.type = type;
-            this.tag = tag;
-            this.passiveSkill = passiveSkill;
         }
     }
 }

@@ -1,0 +1,653 @@
+purity_of_murder:
+  Id: diamond
+  Display: <gradient:#380217:#d9eaf3:#940424:#c7005e>Purity Of Murder
+  Model: 1000
+  TooltipStyle: minecraft:epic
+  Lore:
+  - '              %nexo_epic%'
+  - '<#45adde>● Effect:</#45adde>'
+  - ' <#99d9f7>⤷ You deal more damage as your health goes down.'
+  - ''
+  - '<#b700ff>This silver lunar crest leeches'
+  - '<#b700ff>the grist and grime from your teeth,'
+  - '<#b700ff>the compassion from your eyes,'
+  - '<#b700ff>the grace from your heart,'
+  - '<#b700ff>leaving only the bare essentials of hate.'
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=purity_of_murder_damage} @self ~onTimer:1
+  # - skill{s=purity_of_murder_damage_cal} @self ~onTimer:1
+
+sake_symbiote:
+  Id: diamond
+  Display: <gray>Sake Symbiote</gray>
+  Model: 1011
+  TooltipStyle: minecraft:common
+  Lore:
+    Template: common_items
+    Description: "Through a magician’s meddling was born a helminth with the properties of a sake bug. It feeds off blood and transmutes it into fortifying alcohol."
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Stats:
+  - HEALTH 20to30 ADDITIVE
+
+hakurei_amulet:
+  Id: diamond
+  Display: <gray>Hakurei Amulet</gray>
+  Model: 1012
+  TooltipStyle: minecraft:common
+  Lore:
+    Template: common_items
+    Description: "A cheap yin-yang amulet made of folded paper, whittled wood, and lacquer. Just having it on your person makes you feel barely-there."
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Stats:
+  - DODGE_CHANCE 0.1to0.15 ADDITIVE
+
+traveler_talisman:
+  Id: diamond
+  Display: <gray>Traveler’s Talisman</gray>
+  Model: 1006
+  TooltipStyle: minecraft:common
+  Lore:
+    Template: common_items
+    Description: "An omamori in a green bag. It’s unusually small and ordinary, but the string is durable enough to tie to a sash. The tag reads “Kōtsū-anzen”."
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Stats:
+  - DODGE_CHANCE 0.1to0.15 ADDITIVE
+
+beauty_talisman:
+  Id: diamond
+  Display: <gray>Beauty Talisman</gray>
+  Model: 1001
+  TooltipStyle: minecraft:common
+  Lore:
+    Template: common_items
+    Description: "An omamori in a lavender bag. Seductive silver lining flashes as the bag is turned to the light. The tag reads “En-musubi”."
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Stats:
+  - MAX_MANA 0.1to0.15 MULTIPLY
+
+fortune_talisman:
+  Id: diamond
+  Display: <gray>Fortune Talisman</gray>
+  Model: 1002
+  TooltipStyle: minecraft:uncommon
+  Lore:
+  - '              %nexo_uncommon%'
+  - '<#de7d45>● Buffs:</#de7d45>'
+  - ' <#f7e999>⤷ + Luck II'
+  - ''
+  - '<#8400ff>An omamori in a red bag.'
+  - '<#8400ff>Zig-zag embroidery decorates'
+  - '<#8400ff>the satiny front and back.'
+  - '<#8400ff>The tag reads “Kaiun”.'
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - potion{type=LUCK;level=1;hasparticles=false;duration=200} @self ~onTimer:20
+
+ying_yang_band:
+  Id: diamond
+  Display: <green>Yingyang Band</green>
+  Model: 1030
+  TooltipStyle: minecraft:uncommon
+  Lore:
+  - '              %nexo_uncommon%'
+  - '<#de7d45>● Buffs:</#de7d45>'
+  - ' <#f7e999>⤷ + Haste I'
+  - ''
+  - '<#8400ff>A simple beaded bracelet'
+  - '<#8400ff>made of tiny yin-yang spheres'
+  - '<#8400ff>It emanates a pleasant smell'
+  - '<#8400ff>that makes you want to do your best.'
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - potion{type=HASTE;level=0;hasparticles=false;duration=200} @self ~onTimer:20
+
+entangled_dice:
+  Id: diamond
+  Display: <gray>Entangled Dice</gray>
+  Model: 1032
+  TooltipStyle: minecraft:common
+  Lore:
+  - '              %nexo_common%'
+  - '<#de7d45>● Buffs:</#de7d45>'
+  - ' <#f7e999>⤷ + Luck I'
+  - ''
+  - '<#3700ff>These dice hum in tune'
+  - '<#3700ff>with the resonance of universal chaos'
+  - '<#3700ff>Lady Luck is captivated'
+  - '<#3700ff>by the shiny bauble.'
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - potion{type=LUCK;level=0;hasparticles=false;duration=200} @self ~onTimer:20
+
+snake_hairpiece:
+  Id: diamond
+  Display: <green>Snake Hairpiece</green>
+  Model: 1013
+  TooltipStyle: minecraft:uncommon
+  Lore:
+  - '              %nexo_uncommon%'
+  - '<#de7d45>● Buffs:</#de7d45>'
+  - ' <#f7e999>⤷ + Speed I'
+  - ''
+  - '<#8400ff>A clay figurine of a snake'
+  - '<#8400ff>lacquered to a flimsy metal hairclip.'
+  - '<#8400ff>Wearing it makes you go faster'
+  - '<#8400ff>so fewer people see how'
+  - '<#8400ff>unflattering it looks.'
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - potion{type=SPEED;level=0;hasparticles=false;duration=200} @self ~onTimer:20
+
+wind_serpent_scale:
+  Id: diamond
+  Display: '      <gradient:#0d494f:#57faa7>Wind Serpent Scale'
+  Model: 1029
+  TooltipStyle: minecraft:rare
+  Lore:
+  - '              %nexo_rare%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Speed III for 15s'
+  - '    <#99d9f7>on a 8 block radius.'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>45s</#ff7a8c>'
+  - ''
+  - '<#ff00ea>An overlarge scale from'
+  - '<#ff00ea>the shoresof Wind God Lake.'
+  - '<#ff00ea>When you expose it to the'
+  - '<#ff00ea>open air, the wind appears'
+  - '<#ff00ea>at your back.'
+  UseCooldown:
+    CooldownGroup: windserpentscale # write only in lowercase!
+    CooldownSeconds: 45
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=wind_serpent_scale_speed} @self ~onConsume 
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BOW
+    Sound: block.enchantment_table.use
+    ConsumeEffects:
+
+spiritual_gourd:
+  Id: diamond
+  Display: <gradient:#00f7ff:#1a236f:#00f7ff>Spiritual Gourd
+  Model: 1027
+  TooltipStyle: minecraft:epic
+  Lore:
+  - '              %nexo_epic%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Regeneration II for 30s'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>30s</#ff7a8c>'
+  - ''
+  - '<#b700ff>A gourd containing the vapor of life'
+  - '<#b700ff>When you inhale, the urge to blow'
+  - '<#b700ff>smoke circles is almost irresistable.'
+  UseCooldown:
+    CooldownGroup: spiritualgourd # write only in lowercase!
+    CooldownSeconds: 30
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=spiritual_gourd_regen} @self ~onConsume 
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 2
+    HasParticles: false
+    Animation: DRINK
+    Sound: entity.generic.drink
+    ConsumeEffects:
+
+hakurei_border_dew:
+  Id: diamond
+  Display: <gradient:#fd96f4:#f2abed:#feddfc>Hakurei Border Dew
+  Model: 1018
+  TooltipStyle: minecraft:rare
+  Lore:
+  - '              %nexo_rare%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Haste III for 15s'
+  - '    <#99d9f7>on a 8 block radius.'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>45s</#ff7a8c>'
+  - ''
+  - '<#ff00ea>A bottle of congealed nonsense'
+  - '<#ff00ea>from the borderlands of Gensokyo.'
+  - '<#ff00ea>Uncorking it diffuses the lack'
+  - '<#ff00ea>of common sense all around and makes'
+  - '<#ff00ea>impossible movement quite easy.'
+  UseCooldown:
+    CooldownGroup: hakureiborderdew # write only in lowercase!
+    CooldownSeconds: 45
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=hakurei_border_dew_haste} @self ~onConsume 
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BOW
+    Sound: block.enchantment_table.use
+    ConsumeEffects:
+
+hakurei_border_dew:
+  Id: diamond
+  Display: <gradient:#fd96f4:#f2abed:#feddfc>Hakurei Border Dew
+  Model: 1018
+  TooltipStyle: minecraft:rare
+  Lore:
+  - '              %nexo_rare%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Haste III for 15s'
+  - '    <#99d9f7>on a 8 block radius.'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>45s</#ff7a8c>'
+  - ''
+  - '<#ff00ea>A bottle of congealed nonsense'
+  - '<#ff00ea>from the borderlands of Gensokyo.'
+  - '<#ff00ea>Uncorking it diffuses the lack'
+  - '<#ff00ea>of common sense all around and makes'
+  - '<#ff00ea>impossible movement quite easy.'
+  UseCooldown:
+    CooldownGroup: hakureiborderdew # write only in lowercase!
+    CooldownSeconds: 45
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=hakurei_border_dew_haste} @self ~onConsume 
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BOW
+    Sound: block.enchantment_table.use
+    ConsumeEffects:
+
+misfortune_of_paradise:
+  Id: diamond
+  Display: <gradient:#ff8176:#fff7e9:#d15c4f>Misfortune Of Paradise
+  Model: 1036
+  TooltipStyle: minecraft:rare
+  Lore:
+  - '              %nexo_rare%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Haste II for 30s'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>30s</#ff7a8c>'
+  - ''
+  - '<#ff00ea>A uniquely bad omikuji fortune'
+  - '<#ff00ea>drawn from the Hakurei shrine.'
+  - '<#ff00ea>Just looking at it makes you'
+  - '<#ff00ea>want to hurry up and get it'
+  - '<#ff00ea>all over with.'
+  UseCooldown:
+    CooldownGroup: misfortuneofparadise # write only in lowercase!
+    CooldownSeconds: 30
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=misfortune_of_paradise_haste} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 0.5
+    HasParticles: false
+    Animation: BRUSH
+    Sound: block.enchantment_table.use
+    ConsumeEffects:
+
+buddha_motorcycle_keys:
+  Id: diamond
+  Display: <gradient:#151515:#d6d6d6:#b8b8b8>Buddha’s Motorcycle Keys
+  Model: 1009
+  TooltipStyle: minecraft:epic
+  Lore:
+  - '              %nexo_epic%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Strength II for 30s'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>30s</#ff7a8c>'
+  - ''
+  - '<#b700ff>Spare keys to a two-wheeled'
+  - '<#b700ff>machine powered by cursed blood.'
+  - '<#b700ff>If you hold them in your balled fist,'
+  - '<#b700ff>you can punch with all the strength'
+  - '<#b700ff>of your fist plus the weight of some keys.'
+  UseCooldown:
+    CooldownGroup: buddhamotorcyclekeys # write only in lowercase!
+    CooldownSeconds: 30
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=buddha_motorcycle_keys_strength} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BLOCK
+    Sound: block.note_block.guitar
+    ConsumeEffects:
+
+moriya_wind_ofuda:
+  Id: diamond
+  Display: <gradient:#86cdaa:#46b88e:#86cdaa:#74b83f>Moriya Wind Ofuda
+  Model: 1025
+  TooltipStyle: minecraft:rare
+  Lore:
+  - '              %nexo_rare%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Speed II for 30s'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>30s</#ff7a8c>'
+  - ''
+  - '<#ff00ea>A slip of paper decorated with snakes'
+  - '<#ff00ea>and frogs. It’s too slippery to stay'
+  - '<#ff00ea>stuck on your body.'
+  UseCooldown:
+    CooldownGroup: moriyawindofuda # write only in lowercase!
+    CooldownSeconds: 30
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=moriya_wind_ofuda_speed} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BOW
+    Sound: block.enchantment_table.use
+    ConsumeEffects:
+
+buddha_motorcycle_keys:
+  Id: diamond
+  Display: <gradient:#151515:#d6d6d6:#b8b8b8>Buddha’s Motorcycle Keys
+  Model: 1009
+  TooltipStyle: minecraft:epic
+  Lore:
+  - '              %nexo_epic%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Strength II for 30s'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>30s</#ff7a8c>'
+  - ''
+  - '<#b700ff>Spare keys to a two-wheeled'
+  - '<#b700ff>machine powered by cursed blood.'
+  - '<#b700ff>If you hold them in your balled fist,'
+  - '<#b700ff>you can punch with all the strength'
+  - '<#b700ff>of your fist plus the weight of some keys.'
+  UseCooldown:
+    CooldownGroup: buddhamotorcyclekeys # write only in lowercase!
+    CooldownSeconds: 30
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=buddha_motorcycle_keys_strength} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BLOCK
+    Sound: block.note_block.guitar
+    ConsumeEffects:
+
+warp_dial:
+  Id: diamond
+  Display: <gradient:#b0221b:#ff9797>Warp Dial
+  Model: 1028
+  TooltipStyle: minecraft:legendary
+  Lore:
+  - '              %nexo_legendary%'
+  - '<#ffa214>● Skills:</#ffa214>'
+  - ' <#94fdff>⤷ teleports you in a line or'
+  -                <#94fdff>'to a block hit by a raycast.'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>3s</#ff7a8c>'
+  - ''
+  - '<#ff00c8>This pocketwatch’s internal mechanisms'
+  - '<#ff00c8>have been reforged with hihi’irokane.'
+  - '<#ff00c8>Space folds away from the searing'
+  - '<#ff00c8>arrow of time, leaving you decoupled'
+  - '<#ff00c8>from the strictures of distance.'
+  UseCooldown:
+    CooldownGroup: warpdial # write only in lowercase!
+    CooldownSeconds: 3
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=warp_dial_tp} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BLOCK
+    Sound: block.note_block.snare
+    ConsumeEffects:
+
+hourai_watch:
+  Id: diamond
+  Display: <gradient:#a8a8a8:#c8c8c8:#a8a8a8>Hourai Watch
+  Model: 1020
+  TooltipStyle: minecraft:rare
+  Lore:
+  - '              %nexo_rare%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ Applies Speed X for 4s, but cannot attack.'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>1s</#ff7a8c>'
+  - ''
+  - '<#ff00ea>This pocketwatch is dusted with regolith.'
+  - '<#ff00ea>The world slows when you click the crown;'
+  - '<#ff00ea>unfortunately, time is an unbreakable'
+  - '<#ff00ea>prison for the impure'
+  UseCooldown:
+    CooldownGroup: houraiwatch # write only in lowercase!
+    CooldownSeconds: 1
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=hourai_watch_speed} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 0.5
+    HasParticles: false
+    Animation: BLOCK
+    Sound: block.note_block.snare
+    ConsumeEffects:
+
+oni_cup:
+  Id: diamond
+  Display: <gradient:#eabc77:#daa14a:#fedfa1>Oni Cup
+  Model: 1026
+  TooltipStyle: minecraft:rare
+  Lore:
+  - '              %nexo_rare%'
+  - '<#ffa214>● Buffs:</#ffa214>'
+  - ' <#94fdff>⤷ +100% melee damage on Consume for (8s)'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>20s</#ff7a8c>'
+  - ''
+  - '<#ff00ea>The spirit of a sake bug lingers in this 1-go masu.'
+  - '<#ff00ea>It only refills the cup a single shaku at a time.'
+  UseCooldown:
+    CooldownGroup: onicup # write only in lowercase!
+    CooldownSeconds: 20
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=oni_cup_drink} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 2
+    HasParticles: false
+    Animation: DRINK
+    Sound: entity.generic.drink
+    ConsumeEffects:
+
+steel_magatama:
+  Id: diamond
+  Display: <#757e85>Steel Magatama
+  Model: 1008
+  TooltipStyle: minecraft:uncommon
+  Lore:
+  - '              %nexo_uncommon%'
+  - '<#45adde>● Skills:</#45adde>'
+  - ' <#99d9f7>⤷ +10 absorption for 10s'
+  - ''
+  - '<#ff4059>CD</#ff4059><#666666>:</#666666> <#ff7a8c>25s</#ff7a8c>'
+  - ''
+  - '<#8400ff>A hammered steel replica of a magatama jewel.'
+  - '<#8400ff>magatama jewel. It represents ritual'
+  - '<#8400ff>steadfastness and clarity of spirit.'
+  UseCooldown:
+    CooldownGroup: steelmagatama # write only in lowercase!
+    CooldownSeconds: 25
+  Options:
+    HideFlags: true
+    PreventStacking: true
+    GenerateUUID: true
+    PreventCrafting: true
+    PreventEnchanting: true
+    PreventSmithing: true
+    PreventAnvil: true
+  Skills:
+  - skill{s=steel_magatama_absorption} @self ~onConsume
+  - cancelEvent @self ~onConsume
+  Consumable:
+    ConsumeSeconds: 1
+    HasParticles: false
+    Animation: BOW
+    Sound: block.enchantment_table.use
+    ConsumeEffects:

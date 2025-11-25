@@ -39,24 +39,12 @@ public class AugmentManager {
 
     // Concurrent map to prevent modification errors during tick
     private final Map<UUID, List<AugmentSkill>> activeSkillCache = new ConcurrentHashMap<>();
-    // Cache for active stats to help with debugging or display, though modifiers
-    // are stored on the player
-    private final Map<UUID, List<AugmentStat>> activeStatCache = new ConcurrentHashMap<>();
-
-    // Optimization Caches
-    private final Map<String, io.lumine.mythic.core.skills.stats.StatType> statTypeCache = new ConcurrentHashMap<>();
-    private final Map<String, Attribute> attributeCache = new ConcurrentHashMap<>();
 
     public boolean debugMode = false; // Toggle with /ma debug
 
     public final NamespacedKey KEY_MENU_ITEM;
     public final NamespacedKey KEY_AUGMENT_TYPE;
     public final NamespacedKey KEY_SAVED_INVENTORY;
-
-    // Caches
-    private ItemStack cachedFillerItem;
-    private ItemStack cachedPersistentItem;
-    private String cachedMenuTitle;
 
     public AugmentManager(MythicAugments plugin) {
         this.plugin = plugin;
@@ -70,11 +58,8 @@ public class AugmentManager {
     public void loadSockets() {
         sockets.clear();
         mythicAugmentMap.clear();
-        cachedFillerItem = null;
-        cachedPersistentItem = null;
 
         FileConfiguration config = plugin.getConfig();
-        cachedMenuTitle = color(config.getString("menu.title", "Augments"));
 
         // 1. Load Sockets
         ConfigurationSection section = config.getConfigurationSection("sockets");
@@ -229,11 +214,8 @@ public class AugmentManager {
         removeStats(player); // Remove old stats first
         if (!statsToApply.isEmpty()) {
             applyStats(player, statsToApply);
-            activeStatCache.put(player.getUniqueId(), statsToApply);
             if (debugMode)
                 plugin.getLogger().info("Loaded stats for " + player.getName() + ": " + statsToApply.size());
-        } else {
-            activeStatCache.remove(player.getUniqueId());
         }
     }
 
@@ -346,20 +328,12 @@ public class AugmentManager {
 
     private io.lumine.mythic.core.skills.stats.StatType getStatType(String name) {
         String key = name.toUpperCase();
-        if (statTypeCache.containsKey(key)) {
-            return statTypeCache.get(key);
-        }
         try {
             java.lang.reflect.Field field = io.lumine.mythic.core.skills.stats.Stats.class.getField(key);
-            io.lumine.mythic.core.skills.stats.StatType type = (io.lumine.mythic.core.skills.stats.StatType) field
-                    .get(null);
-            statTypeCache.put(key, type);
-            return type;
+            return (io.lumine.mythic.core.skills.stats.StatType) field.get(null);
         } catch (Exception e) {
             if (debugMode)
                 plugin.getLogger().warning("Unknown Mythic stat: " + name);
-            // Cache nulls to avoid repeated reflection lookups for invalid stats
-            statTypeCache.put(key, null);
             return null;
         }
     }
@@ -403,35 +377,15 @@ public class AugmentManager {
             io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
                     .getPlayerManager().getProfile(player).getStatRegistry();
 
-            // Optimization: Use cache if available to only remove what we added
-            List<AugmentStat> cachedStats = activeStatCache.get(player.getUniqueId());
-            if (cachedStats != null && !cachedStats.isEmpty()) {
-                Set<String> processedStats = new HashSet<>();
-                for (AugmentStat stat : cachedStats) {
-                    String statName = stat.getStat().toUpperCase();
-                    if (processedStats.contains(statName))
-                        continue;
-
-                    // Skip if it's a Bukkit attribute (handled above)
-                    if (mapStatToAttribute(statName) != null)
-                        continue;
-
-                    io.lumine.mythic.core.skills.stats.StatType type = getStatType(statName);
-                    if (type != null) {
-                        registry.removeValue(type, statSource);
-                    }
-                    processedStats.add(statName);
-                }
-            } else {
-                // Fallback: Scan all stats (slow, but necessary if cache is missing)
-                if (debugMode)
-                    plugin.getLogger()
-                            .info("Cache miss during removal for " + player.getName() + ", performing full scan.");
-                for (java.lang.reflect.Field field : io.lumine.mythic.core.skills.stats.Stats.class.getFields()) {
-                    if (field.getType().equals(io.lumine.mythic.core.skills.stats.StatType.class)) {
+            // Always scan all stats to ensure we clean up everything
+            for (java.lang.reflect.Field field : io.lumine.mythic.core.skills.stats.Stats.class.getFields()) {
+                if (field.getType().equals(io.lumine.mythic.core.skills.stats.StatType.class)) {
+                    try {
                         io.lumine.mythic.core.skills.stats.StatType type = (io.lumine.mythic.core.skills.stats.StatType) field
                                 .get(null);
                         registry.removeValue(type, statSource);
+                    } catch (Exception e) {
+                        // Ignore reflection errors
                     }
                 }
             }
@@ -443,10 +397,6 @@ public class AugmentManager {
 
     private Attribute mapStatToAttribute(String stat) {
         String key = stat.toUpperCase();
-        if (attributeCache.containsKey(key)) {
-            return attributeCache.get(key);
-        }
-
         Attribute attr = null;
         switch (key) {
             case "HEALTH":
@@ -482,9 +432,6 @@ public class AugmentManager {
                 attr = null;
                 break;
         }
-
-        // Cache the result (even if null, to avoid re-switch)
-        attributeCache.put(key, attr);
         return attr;
     }
 
@@ -582,7 +529,7 @@ public class AugmentManager {
         int rows = config.getInt("menu.rows", 3);
 
         Inventory inv = Bukkit.createInventory(player, rows * 9,
-                LegacyComponentSerializer.legacyAmpersand().deserialize(cachedMenuTitle));
+                LegacyComponentSerializer.legacyAmpersand().deserialize(getMenuTitle()));
 
         ItemStack filler = getFillerItem();
         for (int i = 0; i < inv.getSize(); i++) {
@@ -719,9 +666,6 @@ public class AugmentManager {
     // --- Utils ---
 
     public ItemStack getPersistentItem() {
-        if (cachedPersistentItem != null)
-            return cachedPersistentItem.clone();
-
         FileConfiguration config = plugin.getConfig();
         String matName = config.getString("persistent-item.material", "ENDER_CHEST");
         Material mat = getMaterialSafe(matName, Material.ENDER_CHEST);
@@ -736,14 +680,10 @@ public class AugmentManager {
             meta.getPersistentDataContainer().set(KEY_MENU_ITEM, PersistentDataType.BYTE, (byte) 1);
             item.setItemMeta(meta);
         }
-        cachedPersistentItem = item;
-        return item.clone();
+        return item;
     }
 
     private ItemStack getFillerItem() {
-        if (cachedFillerItem != null)
-            return cachedFillerItem.clone();
-
         FileConfiguration config = plugin.getConfig();
         String matName = config.getString("menu.filler.material", "GRAY_STAINED_GLASS_PANE");
         Material mat = getMaterialSafe(matName, Material.GRAY_STAINED_GLASS_PANE);
@@ -754,8 +694,7 @@ public class AugmentManager {
             meta.displayName(colorComponent(config.getString("menu.filler.name", " ")));
             item.setItemMeta(meta);
         }
-        cachedFillerItem = item;
-        return item.clone();
+        return item;
     }
 
     private Material getMaterialSafe(String name, Material def) {
@@ -776,7 +715,7 @@ public class AugmentManager {
     }
 
     public String getMenuTitle() {
-        return cachedMenuTitle;
+        return color(plugin.getConfig().getString("menu.title", "Augments"));
     }
 
     public static class Socket {

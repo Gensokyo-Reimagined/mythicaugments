@@ -39,6 +39,7 @@ public class AugmentManager {
 
     // Concurrent map to prevent modification errors during tick
     private final Map<UUID, List<AugmentSkill>> activeSkillCache = new ConcurrentHashMap<>();
+    private final Map<UUID, List<AugmentStat>> activeStatCache = new ConcurrentHashMap<>();
 
     public boolean debugMode = false; // Toggle with /ma debug
 
@@ -176,6 +177,7 @@ public class AugmentManager {
     public void removeCache(Player player) {
         activeSkillCache.remove(player.getUniqueId());
         removeStats(player);
+        activeStatCache.remove(player.getUniqueId());
     }
 
     private void recalculatePlayerSkills(Player player, ItemStack[] items) {
@@ -214,8 +216,11 @@ public class AugmentManager {
         removeStats(player); // Remove old stats first
         if (!statsToApply.isEmpty()) {
             applyStats(player, statsToApply);
+            activeStatCache.put(player.getUniqueId(), statsToApply);
             if (debugMode)
                 plugin.getLogger().info("Loaded stats for " + player.getName() + ": " + statsToApply.size());
+        } else {
+            activeStatCache.remove(player.getUniqueId());
         }
     }
 
@@ -327,15 +332,7 @@ public class AugmentManager {
     }
 
     private io.lumine.mythic.core.skills.stats.StatType getStatType(String name) {
-        String key = name.toUpperCase();
-        try {
-            java.lang.reflect.Field field = io.lumine.mythic.core.skills.stats.Stats.class.getField(key);
-            return (io.lumine.mythic.core.skills.stats.StatType) field.get(null);
-        } catch (Exception e) {
-            if (debugMode)
-                plugin.getLogger().warning("Unknown Mythic stat: " + name);
-            return null;
-        }
+        return io.lumine.mythic.bukkit.MythicBukkit.inst().getStatManager().getStat(name).orElse(null);
     }
 
     private void removeStats(Player player) {
@@ -377,15 +374,15 @@ public class AugmentManager {
             io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
                     .getPlayerManager().getProfile(player).getStatRegistry();
 
-            // Always scan all stats to ensure we clean up everything
-            for (java.lang.reflect.Field field : io.lumine.mythic.core.skills.stats.Stats.class.getFields()) {
-                if (field.getType().equals(io.lumine.mythic.core.skills.stats.StatType.class)) {
-                    try {
-                        io.lumine.mythic.core.skills.stats.StatType type = (io.lumine.mythic.core.skills.stats.StatType) field
-                                .get(null);
+            List<AugmentStat> cachedStats = activeStatCache.get(player.getUniqueId());
+            if (cachedStats != null) {
+                for (AugmentStat stat : cachedStats) {
+                    if (mapStatToAttribute(stat.getStat()) != null)
+                        continue; // Skip if handled by Bukkit
+
+                    io.lumine.mythic.core.skills.stats.StatType type = getStatType(stat.getStat());
+                    if (type != null) {
                         registry.removeValue(type, statSource);
-                    } catch (Exception e) {
-                        // Ignore reflection errors
                     }
                 }
             }

@@ -3,3 +3,5 @@
 .vscode
 build
 additional_src
+bin
+example_item_and_skills

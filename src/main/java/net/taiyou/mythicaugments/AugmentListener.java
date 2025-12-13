@@ -43,16 +43,23 @@ public class AugmentListener implements Listener {
             plugin.getServer().getPluginManager().registerEvent(eventClass, this, EventPriority.NORMAL,
                     (listener, event) -> {
                         if (eventClass.isInstance(event)) {
-                            plugin.getLogger().info("[Debug] MythicRPGPlayerLoadedEvent received.");
+                            if (plugin.getAugmentManager().debugMode) {
+                                plugin.getLogger().info("[Debug] MythicRPGPlayerLoadedEvent received.");
+                            }
                             try {
                                 Player player = (Player) event.getClass().getMethod("getPlayer").invoke(event);
                                 if (player != null && player.isOnline()) {
-                                    plugin.getLogger().info("[Debug] Loading cache for " + player.getName() + " (Sync: "
-                                            + org.bukkit.Bukkit.isPrimaryThread() + ")");
+                                    if (plugin.getAugmentManager().debugMode) {
+                                        plugin.getLogger()
+                                                .info("[Debug] Loading cache for " + player.getName() + " (Sync: "
+                                                        + org.bukkit.Bukkit.isPrimaryThread() + ")");
+                                    }
                                     // Ensure we run on main thread as we touch Bukkit attributes
                                     plugin.getServer().getScheduler().runTask(plugin, () -> {
                                         plugin.getAugmentManager().loadCache(player);
-                                        plugin.getLogger().info("[Debug] Cache loaded (Sync Task).");
+                                        if (plugin.getAugmentManager().debugMode) {
+                                            plugin.getLogger().info("[Debug] Cache loaded (Sync Task).");
+                                        }
                                     });
                                 }
                             } catch (Exception e) {

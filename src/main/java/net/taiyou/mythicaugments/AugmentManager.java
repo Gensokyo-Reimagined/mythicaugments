@@ -41,7 +41,7 @@ public class AugmentManager {
     private final Map<UUID, List<AugmentSkill>> activeSkillCache = new ConcurrentHashMap<>();
     private final Map<UUID, List<AugmentStat>> activeStatCache = new ConcurrentHashMap<>();
 
-    public boolean debugMode = true; // Toggle with /ma debug
+    public boolean debugMode = false; // Toggle with /ma debug
 
     public final NamespacedKey KEY_MENU_ITEM;
     public final NamespacedKey KEY_AUGMENT_TYPE;
@@ -107,34 +107,12 @@ public class AugmentManager {
 
     // --- Ticking System ---
 
-    private long integrityCheckTimer = 0;
-
     public void tick() {
         try {
-            long currentTime = System.currentTimeMillis();
-
-            // Self-Healing & Safety Net
-            integrityCheckTimer++;
-            if (integrityCheckTimer >= 40) {
-                integrityCheckTimer = 0;
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    // Safety Net: Ensure player is loaded
-                    if (!loadedPlayers.contains(player.getUniqueId())) {
-                        plugin.getLogger().info("[Debug] Safety Net: Loading cache for " + player.getName());
-                        loadCache(player);
-                    } else {
-                        // Integrity Check
-                        checkStatIntegrity(player);
-                    }
-                }
-            }
-
             if (activeSkillCache.isEmpty())
-                // Verify if we should return here. If we have stats but no skills, we probably
-                // still want to tick?
-                // Actually the ticker is for SKILLS. Stats are static. So return is fine here
-                // for SKILLS logic.
                 return;
+
+            long currentTime = System.currentTimeMillis();
 
             for (Map.Entry<UUID, List<AugmentSkill>> entry : activeSkillCache.entrySet()) {
                 Player player = Bukkit.getPlayer(entry.getKey());
@@ -159,52 +137,6 @@ public class AugmentManager {
         } catch (Exception e) {
             plugin.getLogger().severe("Error in Augment Ticker: " + e.getMessage());
             e.printStackTrace();
-        }
-    }
-
-    private void checkStatIntegrity(Player player) {
-        List<AugmentStat> cachedStats = activeStatCache.get(player.getUniqueId());
-        if (cachedStats == null || cachedStats.isEmpty())
-            return;
-
-        try {
-            // We only check the first stat to save performance. If one is gone, likely all
-            // are gone.
-            io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
-                    .getPlayerManager().getProfile(player).getStatRegistry();
-
-            boolean missing = false;
-            for (AugmentStat stat : cachedStats) {
-                if (mapStatToAttribute(stat.getStat()) != null)
-                    continue; // Skip Bukkit attributes
-
-                io.lumine.mythic.core.skills.stats.StatType type = getStatType(stat.getStat());
-                if (type != null) {
-                    var statMapOpt = registry.getStatData(type);
-                    if (statMapOpt.isPresent()) {
-                        var statMap = statMapOpt.get();
-                        if (!statMap.getAdditives().containsKey(statSource) &&
-                                !statMap.getAdditiveMultipliers().containsKey(statSource)) {
-                            missing = true;
-                            break;
-                        }
-                    } else {
-                        // StatMap doesn't exist? Then our val is definitely missing.
-                        missing = true;
-                        break;
-                    }
-                }
-            }
-
-            if (missing) {
-                if (debugMode)
-                    plugin.getLogger()
-                            .warning("[Debug] Stats missing for " + player.getName() + ", re-applying (Self-Healing).");
-                applyStats(player, cachedStats);
-            }
-
-        } catch (Exception e) {
-            // Ignore errors here to prevent console spam
         }
     }
 
@@ -238,13 +170,11 @@ public class AugmentManager {
     }
 
     public void loadCache(Player player) {
-        loadedPlayers.add(player.getUniqueId());
         ItemStack[] items = loadPlayerInventory(player);
         recalculatePlayerSkills(player, items);
     }
 
     public void removeCache(Player player) {
-        loadedPlayers.remove(player.getUniqueId());
         activeSkillCache.remove(player.getUniqueId());
         removeStats(player);
         activeStatCache.remove(player.getUniqueId());
@@ -296,38 +226,12 @@ public class AugmentManager {
 
     // --- StatSource Implementation ---
 
-    // Track loaded players to ensure we don't miss anyone
-    private final Set<UUID> loadedPlayers = ConcurrentHashMap.newKeySet();
-
-    // Ensure statSource is instantiated!
     private final AugmentStatSource statSource = new AugmentStatSource();
 
     public class AugmentStatSource implements io.lumine.mythic.core.skills.stats.StatSource {
-        private final String name = "MythicAugments";
-
         @Override
         public boolean removeOnReload() {
-            return false;
-        }
-
-        @Override
-        public String toString() {
-            return name;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-            AugmentStatSource that = (AugmentStatSource) o;
-            return Objects.equals(name, that.name);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(name);
+            return true;
         }
     }
 
@@ -350,6 +254,7 @@ public class AugmentManager {
 
         // 2. Apply Bukkit Attributes
         applyBukkitStats(player, additiveMap, multiplyMap);
+
         // 3. Apply Mythic Stats
         applyMythicStats(player, additiveMap, multiplyMap);
     }
@@ -419,10 +324,6 @@ public class AugmentManager {
                                 .info("Applied Mythic stat (Mult): " + entry.getKey() + " = " + entry.getValue());
                 }
             }
-
-            // Force update
-            registry.updateDirtyStats();
-
         } catch (Exception e) {
             if (debugMode) {
                 plugin.getLogger().warning("Failed to apply Mythic stats: " + e.getMessage());
@@ -431,22 +332,7 @@ public class AugmentManager {
     }
 
     private io.lumine.mythic.core.skills.stats.StatType getStatType(String name) {
-        io.lumine.mythic.core.skills.stats.StatType type = io.lumine.mythic.bukkit.MythicBukkit.inst().getStatManager()
-                .getStat(name).orElse(null);
-        if (type != null)
-            return type;
-
-        // Fallback: Case-insensitive search
-        for (Map.Entry<String, io.lumine.mythic.core.skills.stats.StatType> entry : io.lumine.mythic.bukkit.MythicBukkit
-                .inst().getStatManager().getStats().entrySet()) {
-            if (entry.getKey().equalsIgnoreCase(name)) {
-                return entry.getValue();
-            }
-        }
-
-        if (debugMode)
-            plugin.getLogger().warning("Unknown Mythic stat: " + name);
-        return null;
+        return io.lumine.mythic.bukkit.MythicBukkit.inst().getStatManager().getStat(name).orElse(null);
     }
 
     private void removeStats(Player player) {

@@ -23,62 +23,15 @@ import org.bukkit.persistence.PersistentDataType;
 public class AugmentListener implements Listener {
 
     private final MythicAugments plugin;
-    private boolean useDelay = false;
 
     public AugmentListener(MythicAugments plugin) {
         this.plugin = plugin;
-        registerProfileLoadListener();
-    }
-
-    private void registerProfileLoadListener() {
-        try {
-            // Check if MythicRPG is loaded first
-            if (plugin.getServer().getPluginManager().getPlugin("MythicRPG") == null) {
-                throw new ClassNotFoundException("MythicRPG plugin not found");
-            }
-
-            Class<? extends org.bukkit.event.Event> eventClass = (Class<? extends org.bukkit.event.Event>) Class
-                    .forName("io.lumine.mythicrpg.events.MythicRPGPlayerLoadedEvent");
-
-            plugin.getServer().getPluginManager().registerEvent(eventClass, this, EventPriority.NORMAL,
-                    (listener, event) -> {
-                        if (eventClass.isInstance(event)) {
-                            plugin.getLogger().info("[Debug] MythicRPGPlayerLoadedEvent received.");
-                            try {
-                                Player player = (Player) event.getClass().getMethod("getPlayer").invoke(event);
-                                if (player != null && player.isOnline()) {
-                                    plugin.getLogger().info("[Debug] Loading cache for " + player.getName() + " (Sync: "
-                                            + org.bukkit.Bukkit.isPrimaryThread() + ")");
-                                    // Ensure we run on main thread as we touch Bukkit attributes
-                                    plugin.getServer().getScheduler().runTask(plugin, () -> {
-                                        plugin.getAugmentManager().loadCache(player);
-                                        plugin.getLogger().info("[Debug] Cache loaded (Sync Task).");
-                                    });
-                                }
-                            } catch (Exception e) {
-                                plugin.getLogger()
-                                        .warning("Error handling MythicRPGPlayerLoadedEvent: " + e.getMessage());
-                                e.printStackTrace();
-                            }
-                        }
-                    }, plugin);
-            plugin.getLogger().info("Successfully registered MythicRPGPlayerLoadedEvent listener via Reflection.");
-        } catch (ClassNotFoundException | ClassCastException e) {
-            plugin.getLogger().info("MythicRPG not found or class missing. Using standard delay for stats.");
-            useDelay = true;
-        }
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         givePersistentItem(event.getPlayer());
-        if (useDelay) {
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                if (event.getPlayer().isOnline()) {
-                    plugin.getAugmentManager().loadCache(event.getPlayer());
-                }
-            }, 10L);
-        }
+        plugin.getAugmentManager().loadCache(event.getPlayer());
     }
 
     @EventHandler
@@ -89,23 +42,7 @@ public class AugmentListener implements Listener {
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
         givePersistentItem(event.getPlayer());
-        if (useDelay) {
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                if (event.getPlayer().isOnline()) {
-                    plugin.getAugmentManager().loadCache(event.getPlayer());
-                }
-            }, 10L);
-        }
-    }
-
-    @EventHandler
-    public void onMythicReload(io.lumine.mythic.bukkit.events.MythicReloadedEvent event) {
-        plugin.getLogger().info("MythicMobs reloaded! Re-applying augment stats...");
-        plugin.getAugmentManager().loadSockets();
-
-        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
-            plugin.getAugmentManager().loadCache(p);
-        }
+        plugin.getAugmentManager().loadCache(event.getPlayer());
     }
 
     private void givePersistentItem(Player player) {

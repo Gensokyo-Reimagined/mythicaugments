@@ -41,7 +41,7 @@ public class AugmentManager {
     private final Map<UUID, List<AugmentSkill>> activeSkillCache = new ConcurrentHashMap<>();
     private final Map<UUID, List<AugmentStat>> activeStatCache = new ConcurrentHashMap<>();
 
-    public boolean debugMode = false; // Toggle with /ma debug
+    public boolean debugMode = true; // Toggle with /ma debug
 
     public final NamespacedKey KEY_MENU_ITEM;
     public final NamespacedKey KEY_AUGMENT_TYPE;

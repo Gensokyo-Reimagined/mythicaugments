@@ -77,7 +77,7 @@ public class AugmentListener implements Listener {
 
     // --- INVENTORY HANDLING ---
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.LOW)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player))
             return;

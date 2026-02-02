@@ -112,6 +112,17 @@ public class AugmentListener implements Listener {
                 && event.getHotbarButton() != -1
                 && isPersistentItem(player.getInventory().getItem(event.getHotbarButton())));
 
+        // Block bundle interactions.
+        if (event.getCursor().getType() == Material.BUNDLE && currentIsPersistent) {
+            event.setCancelled(true);
+            return;
+        }
+        if (cursorIsPersistent && event.getCurrentItem() != null
+                && event.getCurrentItem().getType() == Material.BUNDLE) {
+            event.setCancelled(true);
+            return;
+        }
+
         if (currentIsPersistent || cursorIsPersistent || numberKeyIsPersistent) {
 
             // Block all dropping actions.

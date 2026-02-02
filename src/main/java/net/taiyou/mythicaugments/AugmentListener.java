@@ -17,6 +17,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -30,8 +31,11 @@ public class AugmentListener implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        givePersistentItem(event.getPlayer());
-        plugin.getAugmentManager().loadCache(event.getPlayer());
+        // Ensure inventory fully loads.
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            givePersistentItem(event.getPlayer());
+            plugin.getAugmentManager().loadCache(event.getPlayer());
+        }, 1L);
     }
 
     @EventHandler
@@ -41,21 +45,41 @@ public class AugmentListener implements Listener {
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
-        givePersistentItem(event.getPlayer());
-        plugin.getAugmentManager().loadCache(event.getPlayer());
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            givePersistentItem(event.getPlayer());
+            plugin.getAugmentManager().loadCache(event.getPlayer());
+        }, 1L);
     }
 
     private void givePersistentItem(Player player) {
         if (!plugin.getConfig().getBoolean("persistent-item.enabled"))
             return;
 
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (isPersistentItem(item))
-                return;
+        // Remove duplicate persistent items.
+        boolean found = false;
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (isPersistentItem(item)) {
+                if (found) {
+                    player.getInventory().setItem(i, null);
+                } else {
+                    found = true;
+                }
+            }
         }
 
+        if (found)
+            return;
+
         int slot = plugin.getConfig().getInt("persistent-item.slot", 8);
-        player.getInventory().setItem(slot, plugin.getAugmentManager().getPersistentItem());
+        ItemStack item = plugin.getAugmentManager().getPersistentItem();
+
+        if (player.getInventory().getItem(slot) == null) {
+            player.getInventory().setItem(slot, item);
+        } else {
+            player.getInventory().addItem(item);
+        }
     }
 
     private boolean isPersistentItem(ItemStack item) {
@@ -75,31 +99,66 @@ public class AugmentListener implements Listener {
         }
     }
 
-    // --- INVENTORY HANDLING ---
-
     @EventHandler(priority = EventPriority.LOW)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player))
             return;
         Player player = (Player) event.getWhoClicked();
 
-        // 1. GLOBAL PROTECTION (Fixes moving issue)
-        // Prevents moving persistent item in ANY inventory (Survival inv, Crafting,
-        // etc.)
-        if (isPersistentItem(event.getCurrentItem())) {
-            event.setCancelled(true);
-            return;
-        }
-        // Prevents hotbar swapping the persistent item
-        if (event.getHotbarButton() != -1) {
-            if (isPersistentItem(player.getInventory().getItem(event.getHotbarButton()))) {
+        // Check persistent item interaction.
+        boolean currentIsPersistent = isPersistentItem(event.getCurrentItem());
+        boolean cursorIsPersistent = isPersistentItem(event.getCursor());
+        boolean numberKeyIsPersistent = (event.getClick() == org.bukkit.event.inventory.ClickType.NUMBER_KEY
+                && event.getHotbarButton() != -1
+                && isPersistentItem(player.getInventory().getItem(event.getHotbarButton())));
+
+        if (currentIsPersistent || cursorIsPersistent || numberKeyIsPersistent) {
+
+            // Block all dropping actions.
+            if (event.getAction().name().contains("DROP")) {
                 event.setCancelled(true);
                 return;
             }
+
+            Inventory clickedInv = event.getClickedInventory();
+            Inventory topInv = event.getView().getTopInventory();
+
+            // Check if external container.
+            boolean isTopInvPlayer = (topInv.getType() == org.bukkit.event.inventory.InventoryType.CRAFTING
+                    || topInv.getType() == org.bukkit.event.inventory.InventoryType.PLAYER
+                    || topInv.getType() == org.bukkit.event.inventory.InventoryType.CREATIVE);
+
+            // Click outside window.
+            if (clickedInv == null) {
+                event.setCancelled(true);
+                return;
+            }
+
+            // Block external inventory interaction.
+            if (!isTopInvPlayer) {
+                // Persistent item in external.
+                if (clickedInv == topInv) {
+                    if (cursorIsPersistent || numberKeyIsPersistent) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                }
+
+                // Shift-click player to external.
+                if (event.isShiftClick() && clickedInv != topInv) {
+                    event.setCancelled(true);
+                    return;
+                }
+
+                // Swap player to external.
+                if (clickedInv == topInv && numberKeyIsPersistent) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
         }
 
-        // 2. MENU LOGIC
-        // Use cached title for performance
+        // Verify correct menu title.
         String menuTitle = plugin.getAugmentManager().getMenuTitle();
         if (!event.getView().getTitle().equals(menuTitle))
             return;
@@ -113,7 +172,6 @@ public class AugmentListener implements Listener {
                 return;
             }
 
-            // Prevent red glass dupe by manually handling swap
             event.setCancelled(true);
 
             ItemStack cursor = event.getCursor();
@@ -122,7 +180,7 @@ public class AugmentListener implements Listener {
             boolean cursorIsValid = plugin.getAugmentManager().isValidAugment(cursor, socket.requiredType);
             boolean slotHasRealAugment = plugin.getAugmentManager().isValidAugment(current, socket.requiredType);
 
-            // Placing (Cursor -> Slot)
+            // Handle placing into slot.
             if (cursorIsValid) {
                 event.getView().getTopInventory().setItem(slot, cursor);
 
@@ -137,7 +195,7 @@ public class AugmentListener implements Listener {
                 return;
             }
 
-            // Taking (Slot -> Cursor)
+            // Handle taking from slot.
             if ((cursor == null || cursor.getType() == Material.AIR || cursor.getAmount() == 0) && slotHasRealAugment) {
                 event.getView().setCursor(current);
                 event.getView().getTopInventory().setItem(slot, socket.placeholder);
@@ -153,6 +211,24 @@ public class AugmentListener implements Listener {
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
+        // Check persistent item drag.
+        if (isPersistentItem(event.getOldCursor())) {
+            Inventory topInv = event.getView().getTopInventory();
+            boolean isTopInvPlayer = (topInv.getType() == org.bukkit.event.inventory.InventoryType.CRAFTING
+                    || topInv.getType() == org.bukkit.event.inventory.InventoryType.PLAYER
+                    || topInv.getType() == org.bukkit.event.inventory.InventoryType.CREATIVE);
+
+            if (!isTopInvPlayer) {
+                for (int slot : event.getRawSlots()) {
+                    if (slot < topInv.getSize()) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Verify correct menu title.
         String menuTitle = plugin.getAugmentManager().getMenuTitle();
         if (!event.getView().getTitle().equals(menuTitle))
             return;

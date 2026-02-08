@@ -1,6 +1,8 @@
 package net.taiyou.mythicaugments;
 
 import io.lumine.mythic.bukkit.MythicBukkit;
+import io.lumine.mythic.core.constants.MobKeys;
+import io.lumine.mythic.core.skills.stats.StatModifierType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
@@ -17,6 +19,7 @@ import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.io.BukkitObjectInputStream;
 import org.bukkit.util.io.BukkitObjectOutputStream;
@@ -507,8 +510,6 @@ public class AugmentManager {
 
         List<AugmentStat> augmentStats = new ArrayList<>();
         for (String statLine : stats) {
-            // Format: STAT VALUE [TYPE]
-            // Example: HEALTH 20to30 ADDITIVE
             String[] parts = statLine.split("\\s+");
             if (parts.length >= 2) {
                 String stat = parts[0];
@@ -516,21 +517,30 @@ public class AugmentManager {
                 String type = (parts.length > 2) ? parts[2] : "ADDITIVE";
 
                 double value = 0;
-                if (valueStr.contains("to")) {
-                    String[] range = valueStr.split("to");
-                    try {
-                        double min = Double.parseDouble(range[0]);
-                        double max = Double.parseDouble(range[1]);
-                        value = (min + max) / 2.0; // Average for now
-                    } catch (Exception e) {
-                    }
-                } else {
-                    try {
-                        value = Double.parseDouble(valueStr);
-                    } catch (Exception e) {
+                boolean foundOnItem = false;
+
+                // Attempt to read from item PDC using MobKeys.STATS
+                if (item.hasItemMeta()) {
+                    PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
+                    if (container.has(io.lumine.mythic.core.constants.MobKeys.STATS,
+                            io.lumine.mythic.core.constants.MobKeys.STAT_FIELD_ITEMS)) {
+                        Map<String, ? extends Map<String, Double>> statsMap = container.get(
+                                io.lumine.mythic.core.constants.MobKeys.STATS,
+                                io.lumine.mythic.core.constants.MobKeys.STAT_FIELD_ITEMS);
+                        if (statsMap != null && statsMap.containsKey(stat)) {
+                            Map<String, Double> statValues = statsMap.get(stat);
+                            if (statValues != null) {R
+                                StatModifierType modType = StatModifierType.get(type);
+                                String lookupKey = (modType != null) ? modType.toString() : type.toUpperCase();
+
+                                if (statValues.containsKey(lookupKey)) {
+                                    value = statValues.get(lookupKey);
+                                    foundOnItem = true;
+                                }
+                            }
+                        }
                     }
                 }
-
                 augmentStats.add(new AugmentStat(stat, value, type));
             }
         }

@@ -513,11 +513,9 @@ public class AugmentManager {
             String[] parts = statLine.split("\\s+");
             if (parts.length >= 2) {
                 String stat = parts[0];
-                String valueStr = parts[1];
                 String type = (parts.length > 2) ? parts[2] : "ADDITIVE";
 
                 double value = 0;
-                boolean foundOnItem = false;
 
                 // Attempt to read from item PDC using MobKeys.STATS
                 if (item.hasItemMeta()) {
@@ -529,13 +527,12 @@ public class AugmentManager {
                                 io.lumine.mythic.core.constants.MobKeys.STAT_FIELD_ITEMS);
                         if (statsMap != null && statsMap.containsKey(stat)) {
                             Map<String, Double> statValues = statsMap.get(stat);
-                            if (statValues != null) {R
+                            if (statValues != null) {
                                 StatModifierType modType = StatModifierType.get(type);
                                 String lookupKey = (modType != null) ? modType.toString() : type.toUpperCase();
 
                                 if (statValues.containsKey(lookupKey)) {
                                     value = statValues.get(lookupKey);
-                                    foundOnItem = true;
                                 }
                             }
                         }

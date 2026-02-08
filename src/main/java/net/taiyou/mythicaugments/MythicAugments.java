@@ -42,6 +42,11 @@ public final class MythicAugments extends JavaPlugin {
             augmentManager.loadCache(p);
         }
 
+        // Register skills after MythicMobs has loaded
+        getServer().getScheduler().runTask(this, () -> {
+            augmentManager.registerAllSkills();
+        });
+
         logger.info("MythicAugments has been enabled!");
     }
 

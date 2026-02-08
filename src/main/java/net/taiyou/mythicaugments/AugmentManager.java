@@ -433,20 +433,17 @@ public class AugmentManager {
     }
 
     // Helper to get skill from Mythic Item
-    public List<AugmentSkill> getSkillsFromItem(ItemStack item) {
-        String mythicId = getMythicID(item);
-        if (mythicId == null)
-            return null;
+    public void registerAllSkills() {
+        for (MythicItem item : MythicBukkit.inst().getItemManager().getItems()) {
+            List<String> skills = item.getConfig().getStringList("Skills");
+            if (skills != null && !skills.isEmpty()) {
+                processSkills(skills, true);
+            }
+        }
+        dynamicSkillManager.commit();
+    }
 
-        Optional<MythicItem> mythicItemOpt = MythicBukkit.inst().getItemManager().getItem(mythicId);
-        if (!mythicItemOpt.isPresent())
-            return null;
-
-        MythicItem mythicItem = mythicItemOpt.get();
-        List<String> skills = mythicItem.getConfig().getStringList("Skills");
-        if (skills == null || skills.isEmpty())
-            return null;
-
+    private List<AugmentSkill> processSkills(List<String> skills, boolean registerOnly) {
         List<AugmentSkill> augmentSkills = new ArrayList<>();
         Pattern timerPattern = Pattern.compile("~onTimer:(\\d+)");
 
@@ -461,9 +458,13 @@ public class AugmentManager {
                     if (cleanSkill.contains("{") || cleanSkill.contains(" ") || cleanSkill.contains("@")) {
                         // Register dynamic skill
                         String registeredName = dynamicSkillManager.registerSkill(cleanSkill);
-                        augmentSkills.add(new AugmentSkill(registeredName, interval));
+                        if (!registerOnly) {
+                            augmentSkills.add(new AugmentSkill(registeredName, interval));
+                        }
                     } else {
-                        augmentSkills.add(new AugmentSkill(cleanSkill, interval));
+                        if (!registerOnly) {
+                            augmentSkills.add(new AugmentSkill(cleanSkill, interval));
+                        }
                     }
                 } catch (NumberFormatException e) {
                     // Ignore
@@ -471,6 +472,23 @@ public class AugmentManager {
             }
         }
         return augmentSkills;
+    }
+
+    public List<AugmentSkill> getSkillsFromItem(ItemStack item) {
+        String mythicId = getMythicID(item);
+        if (mythicId == null)
+            return null;
+
+        Optional<MythicItem> mythicItemOpt = MythicBukkit.inst().getItemManager().getItem(mythicId);
+        if (!mythicItemOpt.isPresent())
+            return null;
+
+        MythicItem mythicItem = mythicItemOpt.get();
+        List<String> skills = mythicItem.getConfig().getStringList("Skills");
+        if (skills == null || skills.isEmpty())
+            return null;
+
+        return processSkills(skills, false);
     }
 
     public List<AugmentStat> getStatsFromItem(ItemStack item) {

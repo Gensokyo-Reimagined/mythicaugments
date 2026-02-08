@@ -19,6 +19,8 @@ public class DynamicSkillManager {
     private final File skillsFolder;
     private final File generatedFile;
     private final Set<String> registeredHashes = new HashSet<>();
+    private YamlConfiguration skillConfig;
+    private boolean isDirty = false;
 
     public DynamicSkillManager(MythicAugments plugin) {
         this.plugin = plugin;
@@ -29,11 +31,21 @@ public class DynamicSkillManager {
     }
 
     private void loadRegisteredSkills() {
-        if (!generatedFile.exists())
-            return;
+        if (!skillsFolder.exists()) {
+            skillsFolder.mkdirs();
+        }
 
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(generatedFile);
-        for (String key : config.getKeys(false)) {
+        if (!generatedFile.exists()) {
+            try {
+                generatedFile.createNewFile();
+            } catch (IOException e) {
+                plugin.getLogger().severe("Could not create generated skills file!");
+                e.printStackTrace();
+            }
+        }
+
+        skillConfig = YamlConfiguration.loadConfiguration(generatedFile);
+        for (String key : skillConfig.getKeys(false)) {
             if (key.startsWith("MA_Gen_")) {
                 registeredHashes.add(key);
             }
@@ -49,25 +61,29 @@ public class DynamicSkillManager {
         }
 
         // Register new skill
+        // MA_Gen_<Hash>:
+        // Skills:
+        // - <line>
+        List<String> skills = new ArrayList<>();
+        skills.add(skillLine);
+
+        skillConfig.set(skillName + ".Skills", skills);
+        registeredHashes.add(skillName);
+        isDirty = true;
+
+        plugin.getLogger().info("Queued new dynamic skill: " + skillName);
+
+        return skillName;
+    }
+
+    public void commit() {
+        if (!isDirty)
+            return;
+
         try {
-            if (!skillsFolder.exists()) {
-                skillsFolder.mkdirs();
-            }
-
-            YamlConfiguration config = YamlConfiguration.loadConfiguration(generatedFile);
-
-            // Define the skill structure
-            // MA_Gen_<Hash>:
-            // Skills:
-            // - <line>
-            List<String> skills = new ArrayList<>();
-            skills.add(skillLine);
-
-            config.set(skillName + ".Skills", skills);
-            config.save(generatedFile);
-
-            registeredHashes.add(skillName);
-            plugin.getLogger().info("Registered new dynamic skill: " + skillName);
+            skillConfig.save(generatedFile);
+            isDirty = false;
+            plugin.getLogger().info("Saved generated skills to file.");
 
             // Reload MythicMobs skills
             Bukkit.getScheduler().runTask(plugin, () -> {
@@ -78,8 +94,6 @@ public class DynamicSkillManager {
             plugin.getLogger().severe("Failed to save generated skill: " + e.getMessage());
             e.printStackTrace();
         }
-
-        return skillName;
     }
 
     private String getMD5(String input) {

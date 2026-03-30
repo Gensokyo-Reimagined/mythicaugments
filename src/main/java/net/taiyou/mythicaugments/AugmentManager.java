@@ -8,14 +8,9 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.Registry;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeInstance;
-import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -255,55 +250,13 @@ public class AugmentManager {
             }
         }
 
-        // 2. Apply Bukkit Attributes
-        applyBukkitStats(player, additiveMap, multiplyMap);
-
-        // 3. Apply Mythic Stats
-        applyMythicStats(player, additiveMap, multiplyMap);
-    }
-
-    private void applyBukkitStats(Player player, Map<String, Double> additive, Map<String, Double> multiply) {
-        Set<String> processed = new HashSet<>();
-
-        // Helper to process both maps
-        processBukkitStatMap(player, additive, AttributeModifier.Operation.ADD_NUMBER, processed);
-        processBukkitStatMap(player, multiply, AttributeModifier.Operation.ADD_SCALAR, processed);
-    }
-
-    private void processBukkitStatMap(Player player, Map<String, Double> map, AttributeModifier.Operation op,
-            Set<String> processed) {
-        for (Map.Entry<String, Double> entry : map.entrySet()) {
-            String statName = entry.getKey();
-            Attribute attribute = mapStatToAttribute(statName);
-
-            if (attribute != null) {
-                AttributeInstance instance = player.getAttribute(attribute);
-                if (instance != null) {
-                    NamespacedKey key = new NamespacedKey(plugin,
-                            "augment_" + statName.toLowerCase() + "_" + UUID.randomUUID().toString().substring(0, 8));
-                    AttributeModifier modifier = new AttributeModifier(key, entry.getValue(), op,
-                            EquipmentSlotGroup.ANY);
-                    instance.addModifier(modifier);
-                    if (debugMode)
-                        plugin.getLogger().info("Applied Bukkit stat: " + statName + " = " + entry.getValue());
-                } else {
-                    if (debugMode)
-                        plugin.getLogger().warning("AttributeInstance null for: " + statName);
-                }
-            }
-        }
-    }
-
-    private void applyMythicStats(Player player, Map<String, Double> additive, Map<String, Double> multiply) {
+        // Apply all stats through MythicMobs StatRegistry so they participate in the
+        // same calculation as MythicCrucible equipment stats (e.g. health multipliers).
         try {
             io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
                     .getPlayerManager().getProfile(player).getStatRegistry();
 
-            // Apply Additive
-            for (Map.Entry<String, Double> entry : additive.entrySet()) {
-                if (mapStatToAttribute(entry.getKey()) != null)
-                    continue; // Skip if handled by Bukkit
-
+            for (Map.Entry<String, Double> entry : additiveMap.entrySet()) {
                 io.lumine.mythic.core.skills.stats.StatType type = getStatType(entry.getKey());
                 if (type != null) {
                     registry.putValue(type, statSource, io.lumine.mythic.core.skills.stats.StatModifierType.ADDITIVE,
@@ -313,11 +266,7 @@ public class AugmentManager {
                 }
             }
 
-            // Apply Multiply
-            for (Map.Entry<String, Double> entry : multiply.entrySet()) {
-                if (mapStatToAttribute(entry.getKey()) != null)
-                    continue; // Skip if handled by Bukkit
-
+            for (Map.Entry<String, Double> entry : multiplyMap.entrySet()) {
                 io.lumine.mythic.core.skills.stats.StatType type = getStatType(entry.getKey());
                 if (type != null) {
                     registry.putValue(type, statSource,
@@ -329,7 +278,7 @@ public class AugmentManager {
             }
         } catch (Exception e) {
             if (debugMode) {
-                plugin.getLogger().warning("Failed to apply Mythic stats: " + e.getMessage());
+                plugin.getLogger().warning("Failed to apply stats: " + e.getMessage());
             }
         }
     }
@@ -340,49 +289,12 @@ public class AugmentManager {
 
     private void removeStats(Player player) {
         try {
-            // 1. Remove Bukkit Modifiers
-            List<Attribute> attributes = new ArrayList<>();
-            attributes.add(Attribute.MAX_HEALTH);
-            attributes.add(Attribute.ATTACK_DAMAGE);
-            attributes.add(Attribute.MOVEMENT_SPEED);
-            attributes.add(Attribute.ARMOR);
-            attributes.add(Attribute.ARMOR_TOUGHNESS);
-            attributes.add(Attribute.LUCK);
-            attributes.add(Attribute.KNOCKBACK_RESISTANCE);
-            try {
-                attributes.add(Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_speed")));
-            } catch (Exception e) {
-                if (debugMode)
-                    plugin.getLogger().warning("Could not find generic.attack_speed attribute.");
-            }
-
-            for (Attribute attr : attributes) {
-                if (attr == null)
-                    continue;
-                AttributeInstance instance = player.getAttribute(attr);
-                if (instance != null) {
-                    List<AttributeModifier> toRemove = new ArrayList<>();
-                    for (AttributeModifier modifier : instance.getModifiers()) {
-                        if (modifier.getKey().getNamespace().equals(plugin.getName().toLowerCase())) {
-                            toRemove.add(modifier);
-                        }
-                    }
-                    for (AttributeModifier modifier : toRemove) {
-                        instance.removeModifier(modifier);
-                    }
-                }
-            }
-
-            // 2. Remove Mythic Stats
             io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
                     .getPlayerManager().getProfile(player).getStatRegistry();
 
             List<AugmentStat> cachedStats = activeStatCache.get(player.getUniqueId());
             if (cachedStats != null) {
                 for (AugmentStat stat : cachedStats) {
-                    if (mapStatToAttribute(stat.getStat()) != null)
-                        continue; // Skip if handled by Bukkit
-
                     io.lumine.mythic.core.skills.stats.StatType type = getStatType(stat.getStat());
                     if (type != null) {
                         registry.removeValue(type, statSource);
@@ -393,46 +305,6 @@ public class AugmentManager {
             if (debugMode)
                 plugin.getLogger().warning("Error removing stats: " + e.getMessage());
         }
-    }
-
-    private Attribute mapStatToAttribute(String stat) {
-        String key = stat.toUpperCase();
-        Attribute attr = null;
-        switch (key) {
-            case "HEALTH":
-                attr = Attribute.MAX_HEALTH;
-                break;
-            case "DAMAGE":
-                attr = Attribute.ATTACK_DAMAGE;
-                break;
-            case "SPEED":
-                attr = Attribute.MOVEMENT_SPEED;
-                break;
-            case "ARMOR":
-            case "DEFENSE":
-                attr = Attribute.ARMOR;
-                break;
-            case "TOUGHNESS":
-                attr = Attribute.ARMOR_TOUGHNESS;
-                break;
-            case "LUCK":
-                attr = Attribute.LUCK;
-                break;
-            case "KNOCKBACK_RESISTANCE":
-                attr = Attribute.KNOCKBACK_RESISTANCE;
-                break;
-            case "ATTACK_SPEED":
-                try {
-                    attr = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_speed"));
-                } catch (Exception e) {
-                    attr = null;
-                }
-                break;
-            default:
-                attr = null;
-                break;
-        }
-        return attr;
     }
 
     // Helper to get skill from Mythic Item

@@ -17,9 +17,6 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
-import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -90,30 +87,6 @@ public class AugmentListener implements Listener {
             return false;
         return item.getItemMeta().getPersistentDataContainer().has(plugin.getAugmentManager().KEY_MENU_ITEM,
                 PersistentDataType.BYTE);
-    }
-
-    @EventHandler
-    public void onArmorChange(PlayerArmorChangeEvent event) {
-        Player player = event.getPlayer();
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            plugin.getAugmentManager().loadCache(player);
-        }, 1L);
-    }
-
-    @EventHandler
-    public void onItemHeld(PlayerItemHeldEvent event) {
-        Player player = event.getPlayer();
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            plugin.getAugmentManager().loadCache(player);
-        }, 1L);
-    }
-
-    @EventHandler
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        Player player = event.getPlayer();
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            plugin.getAugmentManager().loadCache(player);
-        }, 1L);
     }
 
     @EventHandler

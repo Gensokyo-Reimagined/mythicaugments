@@ -8,6 +8,10 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -289,6 +293,37 @@ public class AugmentManager {
 
     private void removeStats(Player player) {
         try {
+            // Clean up any legacy Bukkit attribute modifiers from the old system
+            List<Attribute> attributes = List.of(
+                    Attribute.MAX_HEALTH, Attribute.ATTACK_DAMAGE, Attribute.MOVEMENT_SPEED,
+                    Attribute.ARMOR, Attribute.ARMOR_TOUGHNESS, Attribute.LUCK,
+                    Attribute.KNOCKBACK_RESISTANCE);
+
+            for (Attribute attr : attributes) {
+                AttributeInstance instance = player.getAttribute(attr);
+                if (instance != null) {
+                    for (AttributeModifier modifier : new ArrayList<>(instance.getModifiers())) {
+                        if (modifier.getKey().getNamespace().equals(plugin.getName().toLowerCase())) {
+                            instance.removeModifier(modifier);
+                        }
+                    }
+                }
+            }
+            try {
+                Attribute attackSpeed = Registry.ATTRIBUTE.get(NamespacedKey.minecraft("generic.attack_speed"));
+                if (attackSpeed != null) {
+                    AttributeInstance instance = player.getAttribute(attackSpeed);
+                    if (instance != null) {
+                        for (AttributeModifier modifier : new ArrayList<>(instance.getModifiers())) {
+                            if (modifier.getKey().getNamespace().equals(plugin.getName().toLowerCase())) {
+                                instance.removeModifier(modifier);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            // Remove MythicMobs stats
             io.lumine.mythic.core.skills.stats.StatRegistry registry = io.lumine.mythic.bukkit.MythicBukkit.inst()
                     .getPlayerManager().getProfile(player).getStatRegistry();
 

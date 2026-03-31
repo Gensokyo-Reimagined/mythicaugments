@@ -144,31 +144,36 @@ public class AugmentManager {
     }
 
     private void executeSkill(Player player, String skillName) {
-        try {
-            // Use API Helper for simpler execution
-            boolean success = MythicBukkit.inst().getAPIHelper().castSkill(player, skillName);
+        executeSkill(player, skillName, io.lumine.mythic.core.skills.SkillTriggers.API);
+    }
 
-            if (success) {
+    private void executeSkill(Player player, String skillName, io.lumine.mythic.api.skills.SkillTrigger trigger) {
+        try {
+            Optional<io.lumine.mythic.api.skills.Skill> maybeSkill = MythicBukkit.inst().getSkillManager().getSkill(skillName);
+            if (!maybeSkill.isPresent()) {
                 if (debugMode) {
-                    // Only log occasionally to avoid spam, or use a cooldown
+                    plugin.getLogger().warning("Skill not found: '" + skillName + "'");
                 }
-            } else {
-                if (debugMode) {
-                    plugin.getLogger().warning("DEBUG: Failed to cast skill: '" + skillName + "'");
-                    if (skillName.contains("{") || skillName.contains(" ") || skillName.contains("@")) {
-                        plugin.getLogger().warning("-> It looks like you are using an inline mechanic.");
-                        plugin.getLogger()
-                                .warning("-> The Augment system requires NAMED skills (e.g., 'SnakeSpeedPassive').");
-                        plugin.getLogger().warning(
-                                "-> Please create a skill file in MythicMobs/Skills/ and reference it in your item.");
-                    } else {
-                        plugin.getLogger().warning(
-                                "-> Ensure the skill '" + skillName + "' exists in your MythicMobs/Skills/ folder.");
-                    }
-                }
+                return;
+            }
+
+            io.lumine.mythic.api.skills.Skill skill = maybeSkill.get();
+            var profile = MythicBukkit.inst().getPlayerManager().getProfile(player);
+            io.lumine.mythic.api.adapters.AbstractEntity casterEntity = io.lumine.mythic.bukkit.BukkitAdapter.adapt(player);
+            io.lumine.mythic.api.adapters.AbstractLocation origin = io.lumine.mythic.bukkit.BukkitAdapter.adapt(player.getLocation());
+
+            io.lumine.mythic.core.skills.SkillMetadataImpl data = new io.lumine.mythic.core.skills.SkillMetadataImpl(
+                    trigger, profile, casterEntity, origin,
+                    com.google.common.collect.Lists.newArrayList(),
+                    com.google.common.collect.Lists.newArrayList(), 1);
+
+            skill.execute(data);
+
+            if (debugMode) {
+                plugin.getLogger().info("Executed skill: " + skillName + " (trigger: " + trigger + ")");
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("Error ticking skill " + skillName + ": " + e.getMessage());
+            plugin.getLogger().warning("Error executing skill " + skillName + ": " + e.getMessage());
         }
     }
 
@@ -177,9 +182,12 @@ public class AugmentManager {
         if (skills == null || skills.isEmpty())
             return;
 
+        String triggerName = trigger.startsWith("on") ? trigger.substring(2) : trigger;
+        io.lumine.mythic.api.skills.SkillTrigger skillTrigger = io.lumine.mythic.api.skills.SkillTrigger.get(triggerName);
+
         for (AugmentSkill skill : skills) {
             if (skill.getTrigger().equalsIgnoreCase(trigger)) {
-                executeSkill(player, skill.getSkillLine());
+                executeSkill(player, skill.getSkillLine(), skillTrigger);
             }
         }
     }

@@ -107,7 +107,6 @@ public class AugmentManager {
         }
     }
 
-    // --- Ticking System ---
 
     public void tick() {
         try {
@@ -171,6 +170,18 @@ public class AugmentManager {
         }
     }
 
+    public void executeTriggeredSkills(Player player, String trigger) {
+        List<AugmentSkill> skills = activeSkillCache.get(player.getUniqueId());
+        if (skills == null || skills.isEmpty())
+            return;
+
+        for (AugmentSkill skill : skills) {
+            if (skill.getTrigger().equalsIgnoreCase(trigger)) {
+                executeSkill(player, skill.getSkillLine());
+            }
+        }
+    }
+
     public void loadCache(Player player) {
         ItemStack[] items = loadPlayerInventory(player);
         recalculatePlayerSkills(player, items);
@@ -226,7 +237,6 @@ public class AugmentManager {
         }
     }
 
-    // --- StatSource Implementation ---
 
     private final AugmentStatSource statSource = new AugmentStatSource();
 
@@ -342,7 +352,6 @@ public class AugmentManager {
         }
     }
 
-    // Helper to get skill from Mythic Item
     public void registerAllSkills() {
         for (MythicItem item : MythicBukkit.inst().getItemManager().getItems()) {
             List<String> skills = item.getConfig().getStringList("Skills");
@@ -356,32 +365,44 @@ public class AugmentManager {
     private List<AugmentSkill> processSkills(List<String> skills, boolean registerOnly) {
         List<AugmentSkill> augmentSkills = new ArrayList<>();
         Pattern timerPattern = Pattern.compile("~onTimer:(\\d+)");
+        Pattern triggerPattern = Pattern.compile("~(on\\w+)");
 
         for (String skillLine : skills) {
-            Matcher matcher = timerPattern.matcher(skillLine);
-            if (matcher.find()) {
+            Matcher timerMatcher = timerPattern.matcher(skillLine);
+            if (timerMatcher.find()) {
                 try {
-                    int interval = Integer.parseInt(matcher.group(1));
+                    int interval = Integer.parseInt(timerMatcher.group(1));
                     String cleanSkill = skillLine.replaceAll("~onTimer:\\d+", "").trim();
-
-                    // Check for inline mechanics
-                    if (cleanSkill.contains("{") || cleanSkill.contains(" ") || cleanSkill.contains("@")) {
-                        // Register dynamic skill
-                        String registeredName = dynamicSkillManager.registerSkill(cleanSkill);
-                        if (!registerOnly) {
-                            augmentSkills.add(new AugmentSkill(registeredName, interval));
-                        }
-                    } else {
-                        if (!registerOnly) {
-                            augmentSkills.add(new AugmentSkill(cleanSkill, interval));
-                        }
+                    String resolved = resolveSkillName(cleanSkill, registerOnly);
+                    if (!registerOnly && resolved != null) {
+                        augmentSkills.add(new AugmentSkill(resolved, "onTimer", interval));
                     }
                 } catch (NumberFormatException e) {
                     // Ignore
                 }
+                continue;
+            }
+
+            Matcher triggerMatcher = triggerPattern.matcher(skillLine);
+            if (triggerMatcher.find()) {
+                String trigger = triggerMatcher.group(1);
+                String cleanSkill = skillLine.replaceAll("~on\\w+", "").trim();
+                String resolved = resolveSkillName(cleanSkill, registerOnly);
+                if (!registerOnly && resolved != null) {
+                    augmentSkills.add(new AugmentSkill(resolved, trigger, 0));
+                }
             }
         }
         return augmentSkills;
+    }
+
+    private String resolveSkillName(String cleanSkill, boolean registerOnly) {
+        if (cleanSkill.contains("{") || cleanSkill.contains(" ") || cleanSkill.contains("@")) {
+            String registeredName = dynamicSkillManager.registerSkill(cleanSkill);
+            return registerOnly ? null : registeredName;
+        } else {
+            return registerOnly ? null : cleanSkill;
+        }
     }
 
     public List<AugmentSkill> getSkillsFromItem(ItemStack item) {
@@ -451,7 +472,6 @@ public class AugmentManager {
         return augmentStats;
     }
 
-    // --- Menus ---
 
     public void openAugmentMenu(Player player) {
         FileConfiguration config = plugin.getConfig();
@@ -543,7 +563,6 @@ public class AugmentManager {
         return activeSkillCache;
     }
 
-    // --- Serialization ---
 
     @SuppressWarnings("deprecation")
     private void savePlayerInventory(Player player, Map<Integer, ItemStack> items) {
@@ -592,7 +611,6 @@ public class AugmentManager {
         return items;
     }
 
-    // --- Utils ---
 
     public ItemStack getPersistentItem() {
         FileConfiguration config = plugin.getConfig();

@@ -129,6 +129,8 @@ public class AugmentManager {
                     continue;
 
                 for (AugmentSkill skill : skills) {
+                    if (!skill.getTrigger().equalsIgnoreCase("onTimer"))
+                        continue;
                     if (currentTime - skill.getLastExecuted() >= skill.getInterval() * 50L) {
                         executeSkill(player, skill.getSkillLine());
                         skill.setLastExecuted(currentTime);

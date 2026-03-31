@@ -9,7 +9,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
 
 public class AugmentCommand implements CommandExecutor {
 
@@ -42,16 +41,12 @@ public class AugmentCommand implements CommandExecutor {
                 plugin.getAugmentManager().debugMode = !plugin.getAugmentManager().debugMode;
                 sender.sendMessage("§eDebug mode: " + plugin.getAugmentManager().debugMode);
                 if (sender instanceof Player) {
-                    List<AugmentSkill> skills = plugin.getAugmentManager().getCache()
+                    AugmentSkillHolder holder = plugin.getAugmentManager().getSkillHolders()
                             .get(((Player) sender).getUniqueId());
-                    if (skills != null && !skills.isEmpty()) {
-                        sender.sendMessage("§7Your active skills:");
-                        for (AugmentSkill skill : skills) {
-                            sender.sendMessage(
-                                    "§7- " + skill.getSkillLine() + " (Interval: " + skill.getInterval() + ")");
-                        }
+                    if (holder != null) {
+                        sender.sendMessage("§7Augment skill holder registered: §atrue");
                     } else {
-                        sender.sendMessage("§7Your active skills: None");
+                        sender.sendMessage("§7Augment skill holder registered: §cfalse");
                     }
                 }
                 return true;
@@ -71,15 +66,7 @@ public class AugmentCommand implements CommandExecutor {
                 p.sendMessage("§e--- Item Info ---");
                 p.sendMessage("§7Mythic ID: §f" + (mythicId == null ? "None" : mythicId));
 
-                List<AugmentSkill> skills = plugin.getAugmentManager().getSkillsFromItem(item);
-                if (skills != null && !skills.isEmpty()) {
-                    p.sendMessage("§7Mapped Skills:");
-                    for (AugmentSkill s : skills) {
-                        p.sendMessage("§7- " + s.getSkillLine() + " (" + s.getInterval() + "t)");
-                    }
-                } else {
-                    p.sendMessage("§7Mapped Skills: §fNone");
-                }
+                p.sendMessage("§7Skills: §f(parsed at equip time via MythicMobs)");
                 return true;
             }
 

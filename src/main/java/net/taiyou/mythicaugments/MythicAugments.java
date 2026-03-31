@@ -3,7 +3,6 @@ package net.taiyou.mythicaugments;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 import java.util.logging.Logger;
 
 public final class MythicAugments extends JavaPlugin {
@@ -29,23 +28,10 @@ public final class MythicAugments extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new AugmentListener(this), this);
         getCommand("mythicaugments").setExecutor(new AugmentCommand(this));
 
-        // Start Ticker (Runs every 5 ticks = 0.25 second)
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                augmentManager.tick();
-            }
-        }.runTaskTimer(this, 20L, 5L);
-
         // Load players if reload happened
         for (Player p : Bukkit.getOnlinePlayers()) {
             augmentManager.loadCache(p);
         }
-
-        // Register skills after MythicMobs has loaded
-        getServer().getScheduler().runTask(this, () -> {
-            augmentManager.registerAllSkills();
-        });
 
         logger.info("MythicAugments has been enabled!");
     }

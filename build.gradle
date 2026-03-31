@@ -25,6 +25,7 @@ dependencies {
 
     compileOnly "org.jetbrains:annotations:24.1.0"
     compileOnly "io.lumine:Mythic-Dist:5.10.1-SNAPSHOT"
+    compileOnly files("${rootProject.projectDir}/../mythiccrucible/plugin/build/libs/MythicCrucible-2.4.0-SNAPSHOT.jar")
 }
 
 java {

@@ -8,9 +8,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import io.lumine.mythic.bukkit.events.MythicReloadedEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -21,7 +18,6 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -65,59 +61,6 @@ public class AugmentListener implements Listener {
         }, 1L);
     }
 
-
-    @EventHandler
-    public void onPlayerDeath(PlayerDeathEvent event) {
-        plugin.getAugmentManager().executeTriggeredSkills(event.getEntity(), "onDeath");
-    }
-
-    @EventHandler
-    public void onPlayerKill(PlayerDeathEvent event) {
-        Player killed = event.getEntity();
-        if (killed.getKiller() != null) {
-            plugin.getAugmentManager().executeTriggeredSkills(killed.getKiller(), "onKill");
-        }
-    }
-
-    @EventHandler
-    public void onPlayerDamaged(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player) {
-            plugin.getAugmentManager().executeTriggeredSkills(player, "onDamaged");
-        }
-    }
-
-    @EventHandler
-    public void onPlayerAttack(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Player player) {
-            plugin.getAugmentManager().executeTriggeredSkills(player, "onAttack");
-        }
-    }
-
-    @EventHandler
-    public void onPlayerShoot(EntityShootBowEvent event) {
-        if (event.getEntity() instanceof Player player) {
-            plugin.getAugmentManager().executeTriggeredSkills(player, "onShoot");
-        }
-    }
-
-    @EventHandler
-    public void onPlayerCrouch(PlayerToggleSneakEvent event) {
-        if (event.isSneaking()) {
-            plugin.getAugmentManager().executeTriggeredSkills(event.getPlayer(), "onCrouch");
-        } else {
-            plugin.getAugmentManager().executeTriggeredSkills(event.getPlayer(), "onUncrouch");
-        }
-    }
-
-    @EventHandler
-    public void onPlayerSwing(org.bukkit.event.player.PlayerAnimationEvent event) {
-        plugin.getAugmentManager().executeTriggeredSkills(event.getPlayer(), "onSwing");
-    }
-
-    @EventHandler
-    public void onPlayerJump(com.destroystokyo.paper.event.player.PlayerJumpEvent event) {
-        plugin.getAugmentManager().executeTriggeredSkills(event.getPlayer(), "onJump");
-    }
 
     private void givePersistentItem(Player player) {
         if (!plugin.getConfig().getBoolean("persistent-item.enabled"))

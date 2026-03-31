@@ -35,12 +35,10 @@ import io.lumine.mythic.core.items.MythicItem;
 public class AugmentManager {
 
     private final MythicAugments plugin;
-    private final DynamicSkillManager dynamicSkillManager;
     private final Map<Integer, Socket> sockets = new HashMap<>();
     private final Map<String, RegisteredAugment> mythicAugmentMap = new HashMap<>();
 
-    // Concurrent map to prevent modification errors during tick
-    private final Map<UUID, List<AugmentSkill>> activeSkillCache = new ConcurrentHashMap<>();
+    private final Map<UUID, AugmentSkillHolder> activeSkillHolders = new ConcurrentHashMap<>();
     private final Map<UUID, List<AugmentStat>> activeStatCache = new ConcurrentHashMap<>();
 
     public boolean debugMode = false; // Toggle with /ma debug
@@ -51,7 +49,6 @@ public class AugmentManager {
 
     public AugmentManager(MythicAugments plugin) {
         this.plugin = plugin;
-        this.dynamicSkillManager = new DynamicSkillManager(plugin);
         this.KEY_MENU_ITEM = new NamespacedKey(plugin, "menu_item");
         this.KEY_AUGMENT_TYPE = new NamespacedKey(plugin, "augment_type");
         this.KEY_SAVED_INVENTORY = new NamespacedKey(plugin, "saved_inv");
@@ -108,103 +105,32 @@ public class AugmentManager {
     }
 
 
-    public void tick() {
-        try {
-            if (activeSkillCache.isEmpty())
-                return;
-
-            long currentTime = System.currentTimeMillis();
-
-            for (Map.Entry<UUID, List<AugmentSkill>> entry : activeSkillCache.entrySet()) {
-                Player player = Bukkit.getPlayer(entry.getKey());
-
-                // Cleanup offline players
-                if (player == null || !player.isOnline()) {
-                    activeSkillCache.remove(entry.getKey());
-                    continue;
-                }
-
-                List<AugmentSkill> skills = entry.getValue();
-                if (skills == null || skills.isEmpty())
-                    continue;
-
-                for (AugmentSkill skill : skills) {
-                    if (!skill.getTrigger().equalsIgnoreCase("onTimer"))
-                        continue;
-                    if (currentTime - skill.getLastExecuted() >= skill.getInterval() * 50L) {
-                        executeSkill(player, skill.getSkillLine());
-                        skill.setLastExecuted(currentTime);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            plugin.getLogger().severe("Error in Augment Ticker: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    private void executeSkill(Player player, String skillName) {
-        executeSkill(player, skillName, io.lumine.mythic.core.skills.SkillTriggers.API);
-    }
-
-    private void executeSkill(Player player, String skillName, io.lumine.mythic.api.skills.SkillTrigger trigger) {
-        try {
-            Optional<io.lumine.mythic.api.skills.Skill> maybeSkill = MythicBukkit.inst().getSkillManager().getSkill(skillName);
-            if (!maybeSkill.isPresent()) {
-                if (debugMode) {
-                    plugin.getLogger().warning("Skill not found: '" + skillName + "'");
-                }
-                return;
-            }
-
-            io.lumine.mythic.api.skills.Skill skill = maybeSkill.get();
-            var profile = MythicBukkit.inst().getPlayerManager().getProfile(player);
-            io.lumine.mythic.api.adapters.AbstractEntity casterEntity = io.lumine.mythic.bukkit.BukkitAdapter.adapt(player);
-            io.lumine.mythic.api.adapters.AbstractLocation origin = io.lumine.mythic.bukkit.BukkitAdapter.adapt(player.getLocation());
-
-            io.lumine.mythic.core.skills.SkillMetadataImpl data = new io.lumine.mythic.core.skills.SkillMetadataImpl(
-                    trigger, profile, casterEntity, origin,
-                    com.google.common.collect.Lists.newArrayList(),
-                    com.google.common.collect.Lists.newArrayList(), 1);
-
-            skill.execute(data);
-
-            if (debugMode) {
-                plugin.getLogger().info("Executed skill: " + skillName + " (trigger: " + trigger + ")");
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Error executing skill " + skillName + ": " + e.getMessage());
-        }
-    }
-
-    public void executeTriggeredSkills(Player player, String trigger) {
-        List<AugmentSkill> skills = activeSkillCache.get(player.getUniqueId());
-        if (skills == null || skills.isEmpty())
-            return;
-
-        String triggerName = trigger.startsWith("on") ? trigger.substring(2) : trigger;
-        io.lumine.mythic.api.skills.SkillTrigger skillTrigger = io.lumine.mythic.api.skills.SkillTrigger.get(triggerName);
-
-        for (AugmentSkill skill : skills) {
-            if (skill.getTrigger().equalsIgnoreCase(trigger)) {
-                executeSkill(player, skill.getSkillLine(), skillTrigger);
-            }
-        }
-    }
-
     public void loadCache(Player player) {
         ItemStack[] items = loadPlayerInventory(player);
         recalculatePlayerSkills(player, items);
     }
 
     public void removeCache(Player player) {
-        activeSkillCache.remove(player.getUniqueId());
+        unregisterSkillHolder(player);
         removeStats(player);
         activeStatCache.remove(player.getUniqueId());
     }
 
+    private void unregisterSkillHolder(Player player) {
+        AugmentSkillHolder old = activeSkillHolders.remove(player.getUniqueId());
+        if (old != null) {
+            try {
+                io.lumine.mythiccrucible.MythicCrucible.inst().getProfileManager().getPlayerProfile(player)
+                        .unregisterExternalHolder(old);
+            } catch (Exception e) {
+                if (debugMode)
+                    plugin.getLogger().warning("Failed to unregister skill holder: " + e.getMessage());
+            }
+        }
+    }
+
     private void recalculatePlayerSkills(Player player, ItemStack[] items) {
-        List<AugmentSkill> skillsToRun = new ArrayList<>();
+        AugmentSkillHolder holder = new AugmentSkillHolder();
         List<AugmentStat> statsToApply = new ArrayList<>();
 
         if (items != null) {
@@ -212,10 +138,7 @@ public class AugmentManager {
                 if (item == null || item.getType() == Material.AIR)
                     continue;
 
-                List<AugmentSkill> itemSkills = getSkillsFromItem(item);
-                if (itemSkills != null && !itemSkills.isEmpty()) {
-                    skillsToRun.addAll(itemSkills);
-                }
+                loadSkillMechanicsFromItem(item, holder);
 
                 List<AugmentStat> itemStats = getStatsFromItem(item);
                 if (itemStats != null && !itemStats.isEmpty()) {
@@ -224,15 +147,16 @@ public class AugmentManager {
             }
         }
 
-        // Update Skills
-        if (!skillsToRun.isEmpty()) {
-            activeSkillCache.put(player.getUniqueId(), skillsToRun);
+        unregisterSkillHolder(player);
+        activeSkillHolders.put(player.getUniqueId(), holder);
+        try {
+            io.lumine.mythiccrucible.MythicCrucible.inst().getProfileManager().getPlayerProfile(player)
+                    .registerExternalHolder(holder);
             if (debugMode)
-                plugin.getLogger().info("Loaded skills for " + player.getName() + ": " + skillsToRun.size());
-        } else {
-            activeSkillCache.remove(player.getUniqueId());
+                plugin.getLogger().info("Registered skill holder for " + player.getName());
+        } catch (Exception e) {
             if (debugMode)
-                plugin.getLogger().info("No skills loaded for " + player.getName());
+                plugin.getLogger().warning("Failed to register skill holder: " + e.getMessage());
         }
 
         // Update Stats
@@ -363,73 +287,44 @@ public class AugmentManager {
     }
 
     public void registerAllSkills() {
-        for (MythicItem item : MythicBukkit.inst().getItemManager().getItems()) {
-            List<String> skills = item.getConfig().getStringList("Skills");
-            if (skills != null && !skills.isEmpty()) {
-                processSkills(skills, true);
-            }
-        }
-        dynamicSkillManager.commit();
+        // No longer needed - skills are parsed via MythicMobs' SkillManager at runtime
     }
 
-    private List<AugmentSkill> processSkills(List<String> skills, boolean registerOnly) {
-        List<AugmentSkill> augmentSkills = new ArrayList<>();
-        Pattern timerPattern = Pattern.compile("~onTimer:(\\d+)");
-        Pattern triggerPattern = Pattern.compile("~(on\\w+)");
-
-        for (String skillLine : skills) {
-            Matcher timerMatcher = timerPattern.matcher(skillLine);
-            if (timerMatcher.find()) {
-                try {
-                    int interval = Integer.parseInt(timerMatcher.group(1));
-                    String cleanSkill = skillLine.replaceAll("~onTimer:\\d+", "").trim();
-                    String resolved = resolveSkillName(cleanSkill, registerOnly);
-                    if (!registerOnly && resolved != null) {
-                        augmentSkills.add(new AugmentSkill(resolved, "onTimer", interval));
-                    }
-                } catch (NumberFormatException e) {
-                    // Ignore
-                }
-                continue;
-            }
-
-            Matcher triggerMatcher = triggerPattern.matcher(skillLine);
-            if (triggerMatcher.find()) {
-                String trigger = triggerMatcher.group(1);
-                String cleanSkill = skillLine.replaceAll("~on\\w+", "").trim();
-                String resolved = resolveSkillName(cleanSkill, registerOnly);
-                if (!registerOnly && resolved != null) {
-                    augmentSkills.add(new AugmentSkill(resolved, trigger, 0));
-                }
-            }
-        }
-        return augmentSkills;
-    }
-
-    private String resolveSkillName(String cleanSkill, boolean registerOnly) {
-        if (cleanSkill.contains("{") || cleanSkill.contains(" ") || cleanSkill.contains("@")) {
-            String registeredName = dynamicSkillManager.registerSkill(cleanSkill);
-            return registerOnly ? null : registeredName;
-        } else {
-            return registerOnly ? null : cleanSkill;
-        }
-    }
-
-    public List<AugmentSkill> getSkillsFromItem(ItemStack item) {
+    private void loadSkillMechanicsFromItem(ItemStack item, AugmentSkillHolder holder) {
         String mythicId = getMythicID(item);
-        if (mythicId == null)
-            return null;
+        if (mythicId == null) return;
 
         Optional<MythicItem> mythicItemOpt = MythicBukkit.inst().getItemManager().getItem(mythicId);
-        if (!mythicItemOpt.isPresent())
-            return null;
+        if (!mythicItemOpt.isPresent()) return;
 
         MythicItem mythicItem = mythicItemOpt.get();
         List<String> skills = mythicItem.getConfig().getStringList("Skills");
-        if (skills == null || skills.isEmpty())
-            return null;
+        if (skills == null || skills.isEmpty()) return;
 
-        return processSkills(skills, false);
+        Pattern timerPattern = Pattern.compile("~onTimer:(\\d+)");
+
+        for (String skillLine : skills) {
+            try {
+                io.lumine.mythic.core.skills.SkillMechanic mechanic = MythicBukkit.inst().getSkillManager()
+                        .getMechanic(mythicItem.getFile(), skillLine);
+                if (mechanic == null) continue;
+
+                Matcher timerMatcher = timerPattern.matcher(skillLine);
+                if (timerMatcher.find()) {
+                    int interval = Integer.parseInt(timerMatcher.group(1));
+                    mechanic.setTimerInterval(interval);
+                    holder.addTimerMechanic(mechanic);
+                } else {
+                    holder.addMechanic(mechanic.getTrigger(), mechanic);
+                }
+
+                if (debugMode)
+                    plugin.getLogger().info("Loaded mechanic: " + skillLine + " (trigger: " + mechanic.getTrigger() + ")");
+            } catch (Exception e) {
+                if (debugMode)
+                    plugin.getLogger().warning("Failed to parse skill line: " + skillLine + " - " + e.getMessage());
+            }
+        }
     }
 
     public List<AugmentStat> getStatsFromItem(ItemStack item) {
@@ -569,8 +464,8 @@ public class AugmentManager {
         return sockets.get(slot);
     }
 
-    public Map<UUID, List<AugmentSkill>> getCache() {
-        return activeSkillCache;
+    public Map<UUID, AugmentSkillHolder> getSkillHolders() {
+        return activeSkillHolders;
     }
 
 
